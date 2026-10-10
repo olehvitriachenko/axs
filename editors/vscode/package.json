@@ -1,0 +1,57 @@
+{
+  "name": "axs-language",
+  "displayName": "AXS Language",
+  "description": "Language support for the AXS serialization format",
+  "version": "0.1.0",
+  "publisher": "axs-dev",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "axs",
+        "aliases": [
+          "AXS"
+        ],
+        "extensions": [
+          ".axs"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "axs",
+        "scopeName": "source.axs",
+        "path": "./syntaxes/axs.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "axs.continueList",
+        "title": "AXS: Continue List"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "axs.continueList",
+        "key": "enter",
+        "when": "editorTextFocus && editorLangId == axs && !suggestWidgetVisible && !inSnippetMode"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.0.0"
+  }
+}

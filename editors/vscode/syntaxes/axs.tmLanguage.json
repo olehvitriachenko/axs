@@ -1,0 +1,114 @@
+
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "AXS",
+  "scopeName": "source.axs",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#blockHeaders"
+    },
+    {
+      "include": "#assignments"
+    },
+    {
+      "include": "#arrayMarkers"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#numbers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.axs",
+          "match": "^\\s*#.*$"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.axs",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.axs",
+              "match": "\\\\(?:[\"\\\\nrt0]|u\\{[0-9a-fA-F]+\\})"
+            }
+          ]
+        }
+      ]
+    },
+    "blockHeaders": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(-\\s+)?([A-Za-z_][A-Za-z0-9_-]*)(\\s*:)\\s*$",
+          "captures": {
+            "2": {
+              "name": "punctuation.definition.list.axs"
+            },
+            "3": {
+              "name": "entity.name.tag.axs"
+            },
+            "4": {
+              "name": "punctuation.separator.key-value.axs"
+            }
+          }
+        }
+      ]
+    },
+    "assignments": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(-\\s+)?([A-Za-z_][A-Za-z0-9_-]*)(\\s*=)",
+          "captures": {
+            "2": {
+              "name": "punctuation.definition.list.axs"
+            },
+            "3": {
+              "name": "variable.other.property.axs"
+            },
+            "4": {
+              "name": "keyword.operator.assignment.axs"
+            }
+          }
+        }
+      ]
+    },
+    "arrayMarkers": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.list.axs",
+          "match": "^\\s*-(?=\\s|$)"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.axs",
+          "match": "\\b(?:true|false|null)\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.axs",
+          "match": "(?<![\\w.])-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?![\\w.])"
+        }
+      ]
+    }
+  }
+}

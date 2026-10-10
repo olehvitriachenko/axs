@@ -1,0 +1,50 @@
+
+{
+  "$schema": "vscode://schemas/language-configuration",
+  "comments": {
+    "lineComment": {
+      "comment": "#",
+      "noIndent": false
+    }
+  },
+  "brackets": [
+    ["[", "]"],
+    ["{", "}"]
+  ],
+  "autoClosingPairs": [
+    {
+      "open": "\"",
+      "close": "\"",
+      "notIn": ["string"]
+    },
+    {
+      "open": "[",
+      "close": "]"
+    },
+    {
+      "open": "{",
+      "close": "}"
+    }
+  ],
+  "surroundingPairs": [
+    ["\"", "\""],
+    ["[", "]"],
+    ["{", "}"]
+  ],
+  "indentationRules": {
+    "increaseIndentPattern": {
+      "pattern": "^\\s*(?:[A-Za-z_][A-Za-z0-9_-]*|-\\s+[A-Za-z_][A-Za-z0-9_-]*)\\s*:\\s*$"
+    },
+    "decreaseIndentPattern": {
+      "pattern": "^\\s*$"
+    }
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*(?:[A-Za-z_][A-Za-z0-9_-]*|-\\s+[A-Za-z_][A-Za-z0-9_-]*)\\s*:\\s*$",
+      "action": {
+        "indent": "indent"
+      }
+    }
+  ]
+}

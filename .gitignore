@@ -1,1 +1,5 @@
 /target
+
+# VS Code extension dependencies and generated output
+/editors/vscode/node_modules/
+/editors/vscode/out/
