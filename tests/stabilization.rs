@@ -46,7 +46,7 @@ fn quotes_array_strings_that_resemble_inline_objects() {
 
 #[test]
 fn preserves_equals_in_quoted_and_unquoted_values() {
-    let values = parse("scalar = a=b=c\nitems\n  - \"name = value\"\n  - bad key = text\n  - name = \"a=b\"\n    extra = c=d").unwrap();
+    let values = parse("scalar = a=b=c\nitems:\n  - \"name = value\"\n  - bad key = text\n  - name = \"a=b\"\n    extra = c=d").unwrap();
     assert_eq!(values["scalar"], AxsValue::String("a=b=c".into()));
     let AxsValue::Array(items) = &values["items"] else {
         panic!("Expected array")
@@ -63,7 +63,7 @@ fn preserves_equals_in_quoted_and_unquoted_values() {
 
 #[test]
 fn comments_are_only_full_lines() {
-    let values = parse("# comment\nroot\n      # ignored indentation\n\n  value = text # literal\n  items\n    # comment\n    - # literal\n    - name = # literal\n      # comment\n      other = true # literal").unwrap();
+    let values = parse("# comment\nroot:\n      # ignored indentation\n\n  value = text # literal\n  items:\n    # comment\n    - # literal\n    - name = # literal\n      # comment\n      other = true # literal").unwrap();
     assert_eq!(parse(&stringify(&values).unwrap()).unwrap(), values);
     let AxsValue::Object(root) = &values["root"] else {
         panic!("Expected object")
@@ -82,7 +82,7 @@ fn comments_are_only_full_lines() {
 #[test]
 fn whitespace_and_crlf_are_consistent() {
     let source =
-        "user\r\n  name  =   Oleh  \r\n  items\r\n    -    Rust  \r\n    - \"  Kyiv  \"\r\n";
+        "user:\r\n  name  =   Oleh  \r\n  items:\r\n    -    Rust  \r\n    - \"  Kyiv  \"\r\n";
     let values = parse(source).unwrap();
     assert_eq!(parse(&stringify(&values).unwrap()).unwrap(), values);
     assert_eq!(
@@ -159,21 +159,21 @@ fn rejects_invalid_block_structure_and_dedentation() {
     for source in [
         "  x = 1",
         "x = 1\n  y = 2",
-        "x\n    y = 2",
-        "x\n  y\n    z = 1\n   a = 2",
-        "x\n  - one\n    - two",
-        "x\n  - one\n  y = 2",
-        "x\n  a = 1\n  - two",
-        "x\n  -\ny = 2",
-        "x\n  - name = one\n      age = 22",
-        "x\n  - name = one\n    - two",
+        "x:\n    y = 2",
+        "x:\n  y:\n    z = 1\n   a = 2",
+        "x:\n  - one\n    - two",
+        "x:\n  - one\n  y = 2",
+        "x:\n  a = 1\n  - two",
+        "x:\n  -\ny = 2",
+        "x:\n  - name = one\n      age = 22",
+        "x:\n  - name = one\n    - two",
     ] {
         assert!(parse(source).is_err(), "{source}");
     }
     let error = parse("x = 1\n  y = 2").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidIndentation);
     assert_eq!(error.span.unwrap().line, 2);
-    let values = parse("x\n  a\n    b = 1\ny = 2").unwrap();
+    let values = parse("x:\n  a:\n    b = 1\ny = 2").unwrap();
     assert_eq!(values["y"], AxsValue::Integer(2));
 }
 
@@ -285,7 +285,7 @@ fn nested_source(depth: usize, tail: &str) -> String {
     let mut source = String::new();
     for level in 0..depth {
         source.push_str(&"  ".repeat(level));
-        source.push_str(if level == 0 { "items\n" } else { "-\n" });
+        source.push_str(if level == 0 { "items:\n" } else { "-\n" });
     }
     source.push_str(&"  ".repeat(depth));
     source.push_str(tail);
@@ -321,10 +321,10 @@ fn inline_objects_count_their_implicit_depth() {
 #[test]
 fn legacy_entry_point_uses_the_same_grammar_and_limits() {
     for source in [
-        "items\n  - \"a=b\"\n  - bad key = text",
+        "items:\n  - \"a=b\"\n  - bad key = text",
         "n = 9223372036854775808",
         "x = \"",
-        "items\n  - key = one\n    key = two",
+        "items:\n  - key = one\n    key = two",
     ] {
         assert_eq!(
             axs::parse_legacy(source),
@@ -364,9 +364,9 @@ fn serializer_rejects_excessive_depth_before_recursing_further() {
 fn spans_cover_entire_invalid_values_and_unicode_columns() {
     let error = parse("x = 🚀\nn = 9223372036854775808").unwrap_err();
     assert_eq!(error.span.unwrap(), SourceSpan::new(2, 5, 19));
-    let error = parse("items\n  - name = \"🚀\\q\"").unwrap_err();
+    let error = parse("items:\n  - name = \"🚀\\q\"").unwrap_err();
     assert_eq!(error.span.unwrap(), SourceSpan::new(2, 12, 5));
-    let error = parse("items\n  - name = a\n    name = b").unwrap_err();
+    let error = parse("items:\n  - name = a\n    name = b").unwrap_err();
     assert_eq!(error.span.unwrap(), SourceSpan::new(3, 5, 4));
 }
 

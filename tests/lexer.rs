@@ -25,9 +25,10 @@ fn tokenizes_assignment() {
 #[test]
 fn tokenizes_indentation() {
     assert_eq!(
-        kinds("user\n  name = Oleh\nage = 22"),
+        kinds("user:\n  name = Oleh\nage = 22"),
         vec![
             TokenKind::Identifier("user".into()),
+            TokenKind::Colon,
             TokenKind::Newline,
             TokenKind::Indent,
             TokenKind::Identifier("name".into()),
@@ -47,9 +48,10 @@ fn tokenizes_indentation() {
 #[test]
 fn tokenizes_array() {
     assert_eq!(
-        kinds("skills\n  - Rust\n  - TypeScript"),
+        kinds("skills:\n  - Rust\n  - TypeScript"),
         vec![
             TokenKind::Identifier("skills".into()),
+            TokenKind::Colon,
             TokenKind::Newline,
             TokenKind::Indent,
             TokenKind::Dash,
@@ -66,7 +68,7 @@ fn tokenizes_array() {
 
 #[test]
 fn tokenizes_array_objects() {
-    let tokens = kinds("users\n  - name = Oleh\n    age = 22");
+    let tokens = kinds("users:\n  - name = Oleh\n    age = 22");
 
     assert!(tokens.contains(&TokenKind::Dash));
     assert!(tokens.contains(&TokenKind::Identifier("name".into())));
@@ -82,7 +84,7 @@ fn preserves_multiword_values() {
 
 #[test]
 fn quoted_array_item_with_equals() {
-    let tokens = kinds("messages\n  - \"Hello = World\"");
+    let tokens = kinds("messages:\n  - \"Hello = World\"");
 
     assert!(tokens.contains(&TokenKind::Value("\"Hello = World\"".into())));
 }
@@ -99,7 +101,7 @@ fn tracks_source_positions() {
 
 #[test]
 fn tracks_array_value_position() {
-    let tokens = tokenize("skills\n  -    Rust").unwrap();
+    let tokens = tokenize("skills:\n  -    Rust").unwrap();
 
     let value = tokens
         .iter()
@@ -112,12 +114,12 @@ fn tracks_array_value_position() {
 
 #[test]
 fn rejects_invalid_indentation() {
-    assert!(tokenize("user\n   name = Oleh").is_err());
+    assert!(tokenize("user:\n   name = Oleh").is_err());
 }
 
 #[test]
 fn rejects_invalid_indent_jump() {
-    assert!(tokenize("user\n    name = Oleh").is_err());
+    assert!(tokenize("user:\n    name = Oleh").is_err());
 }
 
 #[test]

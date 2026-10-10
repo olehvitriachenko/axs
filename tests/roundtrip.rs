@@ -15,12 +15,12 @@ fn primitive_values() {
 
 #[test]
 fn nested_object() {
-    check_roundtrip("user\n  name = Oleh\n  age = 22\n");
+    check_roundtrip("user:\n  name = Oleh\n  age = 22\n");
 }
 
 #[test]
 fn array_of_strings() {
-    check_roundtrip("skills\n  - Rust\n  - TypeScript\n");
+    check_roundtrip("skills:\n  - Rust\n  - TypeScript\n");
 }
 
 #[test]

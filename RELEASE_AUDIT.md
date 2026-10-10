@@ -40,7 +40,7 @@ subprocess-isolated 1 MiB stack probe. Sampling is not exhaustive fuzzing.
 | L1 | Low | Missing MSRV, CI, description, readme, keywords/categories, and explicit package contents. Fixed without inventing authorship or URLs; licensing was subsequently resolved by explicit owner selection. |
 | L2 | Low | MSRV Clippy raised comparison_chain, format_collect, and needless_lifetimes warnings. Fixed in lexer/test code, preserving tests and behavior. |
 | L3 | Low | Public lexer/token/string/primitive modules, exhaustive enums, and legacy String-error APIs enlarge the compatibility surface. Preserved; owner must include them in the eventual stable API commitment. |
-| L4 | Low | The existing demonstration binary and profile.axs are packaged. Decide whether the demonstration belongs in the stable distribution. |
+| L4 | Low | The demonstration binary and profile.axs remain packaged. Decide whether the demonstration belongs in the stable distribution. |
 | L5 | Low | The specification combined two whitespace alternatives with the same key in one text block, which fails as a complete document. Split into separately parseable examples; every text example now has a regression check. |
 
 ## Confirmed fixes and changed files
@@ -70,7 +70,8 @@ subprocess-isolated 1 MiB stack probe. Sampling is not exhaustive fuzzing.
 
 The object-only root, two-space indentation, first-equals assignment rule,
 full-line-only comments, literal # in values, quote decoding, leading-zero
-strings, and decimal-only numeric grammar are unchanged. Lexing rejects tabs,
+strings, and decimal-only numeric grammar are unchanged. Grammar v2 now requires
+colon headers for named blocks; see the migration verification below. Lexing rejects tabs,
 invalid indentation, jumps, keys, and excess physical depth. Parsing rejects
 invalid block transitions, duplicate fields (including inline objects), and
 implicit inline-object depth exceeding canonical block depth 128. Token-parser
@@ -179,6 +180,40 @@ exists. No Windows runtime/emulator is available. No Git remote exists to run
 hosted CI. Native Linux/Windows CI is pending; no cross-platform runtime support
 claim is made solely from cargo check. Toolchain/dependency compatibility is
 verified for the current Cargo.lock graph, not every future allowed Serde release.
+
+## Grammar v2 migration verification
+
+A subsequent authorized pre-1.0 breaking change replaces bare named block keys
+with mandatory `key:` headers. All parser entry points reject legacy bare keys
+and mixed documents. The lexer adds public `TokenKind::Colon`; an inline
+`- key:` opens both an implicit object level and a named child collection level.
+Child content is four spaces below the dash. The serializer writes colon headers
+for every named nonempty collection and expands inline objects canonically.
+Primitive values, escaping, root objects, Serde mappings, public function
+signatures, and the 8 MiB / 262,144-token / 128-level limits are preserved.
+
+Changed in this migration: src/lexer.rs, src/token_parser.rs, src/serializer.rs,
+existing source fixtures/tests, new tests/grammar_v2.rs, profile.axs, README.md,
+spec/AXS.md, PARSER_STATUS.md, SERDE_STATUS.md, CHANGELOG.md, and this audit.
+No additional parser or CLI was introduced. The existing demonstration reads
+its migrated profile.axs through the same public parse/stringify APIs.
+
+The baseline was independently rerun: 139 integration tests and one doctest.
+All 139 tests are retained with syntax fixtures migrated; 19 new focused tests
+bring the total to **158 integration tests plus one doctest**. New coverage
+includes named/inline block combinations, duplicate spans, malformed colons,
+legacy rejection, exact byte/token and depth boundaries, canonical output,
+Serde/demo round trips, and 500 fixed-seed inline-block cases. Existing property
+and mutation coverage is retained, with colon mutations added.
+
+Migration verification commands: `cargo fmt --check`,
+`cargo clippy --all-targets -- -D warnings`, `cargo test`, `cargo test --doc`,
+and `cargo package --allow-dirty`. All pass on the native host. Package
+verification compiles the archive; Cargo still reports missing documentation,
+homepage, or repository URLs. The earlier MSRV/cross-target commands above
+record the preceding audit; they are not claims of native cross-platform runtime
+verification of v2. Hosted native Linux/Windows CI remains pending. No version
+bump, publication, tag, or AXS 1.0 release is declared.
 
 ## Verdict and proposed next steps
 

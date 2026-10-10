@@ -132,7 +132,7 @@ fn one_megabyte_stack_probe() {
             .spawn(|| {
                 let mut source = String::new();
                 for depth in 0..128 {
-                    source.push_str(&format!("{}child\n", "  ".repeat(depth)));
+                    source.push_str(&format!("{}child:\n", "  ".repeat(depth)));
                 }
                 source.push_str(&format!("{}v = 1\n", "  ".repeat(128)));
                 let tree = axs::parse(&source).unwrap();

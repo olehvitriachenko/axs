@@ -5,6 +5,21 @@
 No published release history was verified. The manifest is still 0.1.0; earlier
 development milestone labels are not asserted to be crates.io releases.
 
+### Breaking grammar change
+
+- Grammar v2 requires `key:` for all named nonempty object/array blocks. The
+  parser rejects legacy bare keys and mixed old/new block syntax; no legacy
+  grammar mode is provided. `key = value`, empty `[]`/`{}` assignments, primitive
+  typing, escaping, and resource limits are preserved.
+- Support `- key:` as an inline object's first named collection, with child
+  content four spaces below the dash and continuation fields two spaces below.
+  Serializer output uses colon headers and expanded array objects with bare
+  dashes. Ambiguous colon-prefixed array strings are quoted.
+- Public `TokenKind` adds `Colon`; exhaustive downstream matches need updating.
+  Function signatures and Serde mappings remain unchanged. `parse_legacy` keeps
+  its string-error signature but enforces v2 syntax. See spec/AXS.md and README
+  for migration examples. No version bump, tag, or publication was performed.
+
 ### Added
 
 - Apache-2.0 licensing: complete official root LICENSE, Cargo license metadata,

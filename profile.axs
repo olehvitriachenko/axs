@@ -2,23 +2,23 @@
 name = Oleh
 age = 22
 
-users
+users:
   - name = Oleh
     age = 22
-    skills
+    skills:
       - Rust
       - TypeScript
 
   - name = Alex
     age = 25
-    skills
+    skills:
       - Go
       - PostgreSQL
 
 settings = {}
 tags = []
 
-matrix
+matrix:
   -
     - 1
     - 2

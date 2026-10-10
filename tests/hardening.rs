@@ -12,12 +12,12 @@ fn rejects_indentation_after_scalar() {
 
 #[test]
 fn rejects_missing_nested_block() {
-    assert!(parse("user").is_err());
+    assert!(parse("user:").is_err());
 }
 
 #[test]
 fn rejects_duplicate_nested_key() {
-    let source = "user\n  name = Oleh\n  name = Alex";
+    let source = "user:\n  name = Oleh\n  name = Alex";
 
     let error = parse(source).unwrap_err();
 
@@ -27,7 +27,7 @@ fn rejects_duplicate_nested_key() {
 
 #[test]
 fn rejects_duplicate_inline_object_key() {
-    let source = "users\n  - name = Oleh\n    name = Alex";
+    let source = "users:\n  - name = Oleh\n    name = Alex";
 
     let error = parse(source).unwrap_err();
 
@@ -36,7 +36,7 @@ fn rejects_duplicate_inline_object_key() {
 
 #[test]
 fn tracks_duplicate_inline_key_position() {
-    let source = "users\n  - name = Oleh\n    name = Alex";
+    let source = "users:\n  - name = Oleh\n    name = Alex";
 
     let error = parse(source).unwrap_err();
     let span = error.span.unwrap();
@@ -49,7 +49,7 @@ fn tracks_duplicate_inline_key_position() {
 
 #[test]
 fn preserves_quoted_equals_in_array() {
-    let source = "messages\n  - \"Hello = World\"";
+    let source = "messages:\n  - \"Hello = World\"";
 
     let result = parse(source).unwrap();
     let AxsValue::Array(items) = &result["messages"] else {
@@ -93,7 +93,7 @@ fn rejects_unterminated_string() {
 
 #[test]
 fn rejects_invalid_array_indentation() {
-    let source = "skills\n  - Rust\n      - Go";
+    let source = "skills:\n  - Rust\n      - Go";
 
     assert!(parse(source).is_err());
 }

@@ -11,6 +11,7 @@ pub const MAX_TOKENS: usize = 262_144;
 pub enum TokenKind {
     Identifier(String),
     Equals,
+    Colon,
     Dash,
     Value(String),
     Indent,
@@ -52,13 +53,20 @@ pub(crate) fn valid_key(key: &str) -> bool {
     start && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+// Only the first delimiter is structural; assignment values remain opaque.
+pub(crate) fn entry_delimiter(text: &str) -> Option<(usize, char)> {
+    text.char_indices().find(|(_, ch)| matches!(ch, '=' | ':'))
+}
+
 fn emit_entry(
     text: &str,
     line: usize,
     column: usize,
     tokens: &mut Vec<Token>,
 ) -> Result<(), AxsError> {
-    if let Some((raw_key, raw_value)) = text.split_once('=') {
+    if let Some((offset, '=')) = entry_delimiter(text) {
+        let (raw_key, remainder) = text.split_at(offset);
+        let raw_value = &remainder[1..];
         let key = raw_key.trim();
         let value = raw_value.trim();
 
@@ -105,9 +113,8 @@ fn emit_entry(
             line,
             column + value_offset,
         ));
-    } else {
-        let key = text.trim();
-
+    } else if let Some((offset, ':')) = entry_delimiter(text) {
+        let key = text[..offset].trim_end();
         if !valid_key(key) {
             return Err(error(
                 ErrorKind::InvalidKey,
@@ -115,11 +122,35 @@ fn emit_entry(
                 line,
                 column,
                 key.chars().count().max(1),
-            )
-            .with_help("Keys may contain letters, digits, '-' and '_'"));
+            ));
         }
-
+        let colon_column = column + text[..offset].chars().count();
+        if !text[offset + 1..].trim().is_empty() {
+            return Err(error(
+                ErrorKind::UnexpectedToken,
+                "Expected end of line after ':'",
+                line,
+                colon_column,
+                text[offset..].chars().count(),
+            )
+            .with_help("Use 'key:' for a nested collection or 'key = value' for an assignment"));
+        }
         tokens.push(token(TokenKind::Identifier(key.into()), line, column));
+        tokens.push(token(TokenKind::Colon, line, colon_column));
+    } else {
+        let key = text.trim();
+        let (kind, message) = if valid_key(key) {
+            (
+                ErrorKind::UnexpectedToken,
+                "Bare block keys are invalid; expected ':' or '='".to_owned(),
+            )
+        } else {
+            (ErrorKind::InvalidKey, format!("Invalid key '{key}'"))
+        };
+        return Err(
+            error(kind, &message, line, column, key.chars().count().max(1))
+                .with_help("Use 'key:' for a nested collection or 'key = value' for an assignment"),
+        );
     }
 
     Ok(())
@@ -138,7 +169,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
             "AXS supports at most {MAX_INPUT_BYTES} input bytes"
         )));
     }
-    let mut tokens = Vec::new();
+    let mut tokens: Vec<Token> = Vec::new();
     let mut indents = vec![0usize];
 
     for (index, raw) in input.lines().enumerate() {
@@ -201,7 +232,14 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
 
         match depth.cmp(&current) {
             std::cmp::Ordering::Greater => {
-                if depth != current + 1 {
+                // An inline named block has an implicit object level at the
+                // dash's continuation indentation and a child collection level.
+                let inline_named_block = tokens.len() >= 4
+                    && matches!(tokens[tokens.len() - 4].kind, TokenKind::Dash)
+                    && matches!(tokens[tokens.len() - 3].kind, TokenKind::Identifier(_))
+                    && matches!(tokens[tokens.len() - 2].kind, TokenKind::Colon)
+                    && matches!(tokens[tokens.len() - 1].kind, TokenKind::Newline);
+                if depth != current + 1 && !(inline_named_block && depth == current + 2) {
                     return Err(error(
                         ErrorKind::InvalidIndentation,
                         "Invalid indentation jump",
@@ -212,8 +250,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
                     .with_help("Increase indentation by one level at a time"));
                 }
 
-                indents.push(depth);
-                tokens.push(token(TokenKind::Indent, line, spaces + 1));
+                for level in current + 1..=depth {
+                    indents.push(level);
+                    tokens.push(token(TokenKind::Indent, line, level * 2 + 1));
+                }
             }
             std::cmp::Ordering::Less => {
                 if !indents.contains(&depth) {
@@ -258,8 +298,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
 
             if rest.starts_with('"') {
                 tokens.push(token(TokenKind::Value(rest.into()), line, value_column));
-            } else if let Some((key, _)) = rest.split_once('=') {
-                if valid_key(key.trim()) {
+            } else if let Some((offset, _)) = entry_delimiter(rest) {
+                if valid_key(rest[..offset].trim()) {
                     emit_entry(rest, line, value_column, &mut tokens)?;
                 } else {
                     tokens.push(token(TokenKind::Value(rest.into()), line, value_column));

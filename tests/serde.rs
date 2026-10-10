@@ -135,13 +135,13 @@ fn all_externally_tagged_enum_variants_roundtrip() {
 #[test]
 fn invalid_enum_shapes_and_unknown_variants_fail() {
     for text in [
-        "values\n  - Unknown",
-        "values\n  - renamed",
-        "values\n  - Idle = null",
-        "values\n  - renamed = true",
-        "values\n  - Pair\n      - one",
-        "values\n  -\n    renamed = 1\n    extra = 2",
-        "values\n  - {}",
+        "values:\n  - Unknown",
+        "values:\n  - renamed",
+        "values:\n  - Idle = null",
+        "values:\n  - renamed = true",
+        "values:\n  - Pair:\n      - one",
+        "values:\n  -\n    renamed = 1\n    extra = 2",
+        "values:\n  - {}",
     ] {
         assert!(from_str::<Events>(text).is_err(), "{text}");
     }
@@ -183,7 +183,7 @@ struct Defaults {
 
 #[test]
 fn missing_defaults_null_unknown_and_renamed_fields_follow_serde() {
-    let value = from_str::<Defaults>("required = 1\nunknown\n  - nested = true").unwrap();
+    let value = from_str::<Defaults>("required = 1\nunknown:\n  - nested = true").unwrap();
     assert_eq!(value.optional, None);
     assert!(value.values.is_empty());
     assert_eq!(value.name, "");
@@ -434,7 +434,7 @@ fn parser_errors_keep_spans_and_conversion_errors_have_context() {
     let error = from_str::<Profile>("age = 9223372036854775808").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidNumber);
     assert_eq!(error.span.unwrap().column, 7);
-    let error = from_str::<BTreeMap<String, Vec<u8>>>("values\n  - 1\n  - 256").unwrap_err();
+    let error = from_str::<BTreeMap<String, Vec<u8>>>("values:\n  - 1\n  - 256").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidNumber);
     assert!(error.message.contains("field 'values'"));
     assert!(error.message.contains("index 1"));
@@ -531,7 +531,7 @@ fn collection_depth_is_checked_while_building_the_tree() {
     let mut source = String::new();
     for depth in 0..=129 {
         source.push_str(&"  ".repeat(depth));
-        source.push_str("child\n");
+        source.push_str("child:\n");
     }
     assert_eq!(
         from_str::<BTreeMap<String, String>>(&source)
@@ -617,7 +617,7 @@ fn byte_token_and_conversion_budgets_are_enforced() {
 
 #[test]
 fn tuple_lengths_are_checked() {
-    for source in ["v = []", "v\n  - 1", "v\n  - 1\n  - true\n  - extra"] {
+    for source in ["v = []", "v:\n  - 1", "v:\n  - 1\n  - true\n  - extra"] {
         assert!(from_str::<BTreeMap<String, (i32, bool)>>(source).is_err());
     }
     roundtrip(&BTreeMap::from([("v".to_owned(), (1i32, true))]));
@@ -691,14 +691,14 @@ fn explicit_bytes_use_checked_integer_arrays() {
         Bytes(vec![0, 1, 127, 255]),
     )]));
     roundtrip(&BTreeMap::from([("bytes".to_owned(), Bytes(vec![]))]));
-    for text in ["bytes\n  - -1", "bytes\n  - 256"] {
+    for text in ["bytes:\n  - -1", "bytes:\n  - 256"] {
         assert_eq!(
             from_str::<BTreeMap<String, Bytes>>(text).unwrap_err().kind,
             ErrorKind::InvalidNumber
         );
     }
     assert_eq!(
-        from_str::<BTreeMap<String, Bytes>>("bytes\n  - 1.0")
+        from_str::<BTreeMap<String, Bytes>>("bytes:\n  - 1.0")
             .unwrap_err()
             .kind,
         ErrorKind::InvalidValue
@@ -807,7 +807,7 @@ fn malformed_inputs_return_errors_through_the_public_serde_api() {
         "x = \"\\q\"",
         "x = 9223372036854775808",
         "  x = 1",
-        "x\n   y = 1",
+        "x:\n   y = 1",
         "name = a\nname = b",
     ] {
         let error = from_str::<BTreeMap<String, String>>(source).unwrap_err();
@@ -860,7 +860,7 @@ impl<'de> Deserialize<'de> for PartialSequence {
 }
 #[test]
 fn partial_custom_visitors_cannot_silently_discard_sequence_elements() {
-    let error = from_str::<BTreeMap<String, PartialSequence>>("v\n  - 1\n  - 2").unwrap_err();
+    let error = from_str::<BTreeMap<String, PartialSequence>>("v:\n  - 1\n  - 2").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidValue);
     assert!(error.message.contains("did not consume"));
 }

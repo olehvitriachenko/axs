@@ -10,7 +10,9 @@ axs::to_string<T: serde::Serialize + ?Sized>(&T) -> Result<String, AxsError>
 Deserialization uses the existing parser, wraps its root map in
 `AxsValue::Object`, and visits the owned tree. Serialization builds an
 `AxsValue` tree and passes its root map to the existing text serializer. There
-is no second parser, new text syntax, or automatic scalar-root envelope.
+is no second parser or automatic scalar-root envelope. Both directions now use
+grammar v2: named nonempty blocks require `:`, and old bare block keys are
+rejected. Serde mappings and conversion policies remain unchanged.
 Adapters are private. `parse`, `tokenize`, `stringify`, and the `AxsValue` data
 model retain their existing APIs. AxsValue itself has no new Serde trait impls.
 
@@ -58,8 +60,8 @@ For example, a nested `State::Ready` field uses `state = Ready`; a nested
 `State::Progress { percent: 75 }` uses:
 
 ```text
-state
-  Progress
+state:
+  Progress:
     percent = 75
 ```
 

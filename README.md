@@ -5,6 +5,46 @@ object root; nonempty objects and arrays use blocks, and indentation is two
 ASCII spaces per level. The Rust implementation includes a parser, deterministic
 serializer, structured diagnostics, and Serde integration.
 
+Grammar v2 requires `:` on every named nonempty block:
+
+```text
+user:
+  name = Oleh
+  age = 22
+skills:
+  - Rust
+categories:
+  - UI:
+      - MUI
+      - Tailwind
+```
+
+`=` assigns primitive values or empty collections (`[]`, `{}`). A bare `-`
+introduces an unnamed nested collection. In `- UI:`, the child content is four
+spaces deeper than the dash; sibling object fields are two spaces deeper.
+Quoted strings may contain `:`, `=`, and `-` as literal text. Quote array strings
+such as `UI:` or `http://host` so they are not classified as inline object headers.
+
+This deliberately breaks the old grammar before 1.0. For example:
+
+```axs-legacy
+user
+  name = Oleh
+```
+
+must become:
+
+```text
+user:
+  name = Oleh
+```
+
+Bare named keys and documents mixing bare and colon block headers are rejected,
+including through `parse_legacy` (which preserves its signature only). See
+[the specification](spec/AXS.md) for the formal grammar and migration examples.
+Public `TokenKind` adds `Colon`; exhaustive matches must handle it. Rust API
+signatures, primitive typing, string escaping, and resource limits are retained.
+
 In a consuming crate, add `axs` and enable Serde's derive feature:
 
 ```toml

@@ -1,5 +1,5 @@
 use crate::error::{AxsError, ErrorKind};
-use crate::lexer::{MAX_INPUT_BYTES, MAX_NESTING_DEPTH, tokenize, valid_key};
+use crate::lexer::{MAX_INPUT_BYTES, MAX_NESTING_DEPTH, entry_delimiter, tokenize, valid_key};
 use crate::string;
 use crate::value::AxsValue;
 use crate::value_parser::parse_value;
@@ -31,12 +31,12 @@ fn write_object(object: &AxsObject, depth: usize, output: &mut String) -> Result
 
         match value {
             AxsValue::Object(nested) if !nested.is_empty() => {
-                append(output, &format!("{indent}{key}\n"))?;
+                append(output, &format!("{indent}{key}:\n"))?;
                 write_object(nested, depth + 1, output)?;
             }
 
             AxsValue::Array(items) if !items.is_empty() => {
-                append(output, &format!("{indent}{key}\n"))?;
+                append(output, &format!("{indent}{key}:\n"))?;
                 write_array(items, depth + 1, output)?;
             }
 
@@ -138,8 +138,8 @@ fn is_safe_unquoted(value: &str) -> bool {
         || value.trim() != value
         || value.chars().any(char::is_control)
         || value.starts_with('"')
-        // In an array, a valid key followed by '=' denotes an inline object.
-        || value.split_once('=').is_some_and(|(key, _)| valid_key(key.trim()))
+        // Array strings must not look like inline assignments or named blocks.
+        || entry_delimiter(value).is_some_and(|(offset, _)| valid_key(value[..offset].trim()))
     {
         return false;
     }

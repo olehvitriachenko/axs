@@ -75,7 +75,7 @@ fn rejects_excessive_nesting() {
 
     for depth in 0..=129 {
         source.push_str(&"  ".repeat(depth));
-        source.push_str("item\n");
+        source.push_str("item:\n");
     }
 
     let error = parse(&source).unwrap_err();
@@ -89,7 +89,7 @@ fn rejects_excessive_nesting() {
 
 #[test]
 fn accepts_normal_nesting() {
-    let source = "user\n  profile\n    age = 22";
+    let source = "user:\n  profile:\n    age = 22";
 
     let result = parse(source).unwrap();
 
@@ -107,7 +107,7 @@ fn accepts_normal_nesting() {
     let mut source = String::new();
     for depth in 0..128 {
         source.push_str(&"  ".repeat(depth));
-        source.push_str("item\n");
+        source.push_str("item:\n");
     }
     source.push_str(&"  ".repeat(128));
     source.push_str("age = 22\n");

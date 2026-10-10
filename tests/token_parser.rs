@@ -19,18 +19,18 @@ fn parses_primitives() {
 
 #[test]
 fn parses_nested_object() {
-    assert_compatible("user\n  name = Oleh\n  age = 22\n");
+    assert_compatible("user:\n  name = Oleh\n  age = 22\n");
 }
 
 #[test]
 fn parses_array() {
-    assert_compatible("skills\n  - Rust\n  - TypeScript\n");
+    assert_compatible("skills:\n  - Rust\n  - TypeScript\n");
 }
 
 #[test]
 fn parses_inline_objects() {
     assert_compatible(
-        r#"users
+        r#"users:
   - name = Oleh
     age = 22
   - name = Alex
@@ -42,13 +42,13 @@ fn parses_inline_objects() {
 #[test]
 fn parses_deeply_nested_structures() {
     assert_compatible(
-        r#"users
+        r#"users:
   - name = Oleh
-    skills
+    skills:
       - Rust
       - TypeScript
   - name = Alex
-    skills
+    skills:
       - Go
 "#,
     );
@@ -57,7 +57,7 @@ fn parses_deeply_nested_structures() {
 #[test]
 fn parses_nested_arrays() {
     assert_compatible(
-        r#"matrix
+        r#"matrix:
   -
     - 1
     - 2
@@ -85,7 +85,7 @@ fn rejects_duplicate_keys() {
 
 #[test]
 fn rejects_invalid_indentation() {
-    assert!(parse_tokens("user\n    name = Oleh").is_err());
+    assert!(parse_tokens("user:\n    name = Oleh").is_err());
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn rejects_missing_value() {
 
 #[test]
 fn parses_array_objects() {
-    let data = parse_tokens("users\n  - name = Oleh\n    age = 22\n").unwrap();
+    let data = parse_tokens("users:\n  - name = Oleh\n    age = 22\n").unwrap();
 
     let AxsValue::Array(users) = &data["users"] else {
         panic!("Expected array");

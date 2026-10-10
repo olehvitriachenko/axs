@@ -25,7 +25,7 @@ fn empty_object() {
 #[test]
 fn array_of_objects() {
     roundtrip(
-        r#"users
+        r#"users:
   - name = Oleh
     age = 22
   - name = Alex
@@ -37,7 +37,7 @@ fn array_of_objects() {
 #[test]
 fn nested_arrays() {
     roundtrip(
-        r#"matrix
+        r#"matrix:
   -
     - 1
     - 2
@@ -51,13 +51,13 @@ fn nested_arrays() {
 #[test]
 fn nested_objects_in_arrays() {
     roundtrip(
-        r#"users
+        r#"users:
   - name = Oleh
-    skills
+    skills:
       - Rust
       - TypeScript
   - name = Alex
-    skills
+    skills:
       - Go
 "#,
     );
@@ -66,7 +66,7 @@ fn nested_objects_in_arrays() {
 #[test]
 fn empty_collections_inside_array() {
     roundtrip(
-        r#"items
+        r#"items:
   - []
   - {}
   - null
@@ -76,5 +76,5 @@ fn empty_collections_inside_array() {
 
 #[test]
 fn rejects_inconsistent_indentation() {
-    assert!(parse("user\n    name = Oleh").is_err());
+    assert!(parse("user:\n    name = Oleh").is_err());
 }

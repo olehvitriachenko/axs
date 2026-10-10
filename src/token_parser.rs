@@ -216,7 +216,8 @@ impl<'a> TokenParser<'a> {
                     value
                 }
 
-                Some(TokenKind::Newline) => {
+                Some(TokenKind::Colon) => {
+                    self.advance();
                     self.expect_newline()?;
                     self.expect_indent()?;
 
@@ -227,9 +228,10 @@ impl<'a> TokenParser<'a> {
                 }
 
                 _ => {
-                    return Err(
-                        self.error(ErrorKind::UnexpectedToken, "Expected '=' or nested block")
-                    );
+                    return Err(self.error(
+                        ErrorKind::UnexpectedToken,
+                        "Expected '=' or ':' for a named nested block",
+                    ));
                 }
             };
 
@@ -308,21 +310,36 @@ impl<'a> TokenParser<'a> {
         let key_span = self.identifier_span();
         let key = self.read_identifier()?;
 
-        self.expect_equals()?;
-
-        let value = self.read_value()?;
-        self.expect_newline()?;
-
-        self.insert_field(&mut object, key, value, key_span)?;
-
-        // Read additional object fields directly into the
-        // same HashMap instead of creating a temporary one.
-        if matches!(self.kind(), Some(TokenKind::Indent)) {
+        if matches!(self.kind(), Some(TokenKind::Colon)) {
+            self.advance();
+            self.expect_newline()?;
+            // The inline object's fields live one level below the dash; its
+            // first named collection must live one further level below that.
             self.expect_indent()?;
-
-            self.parse_object_into(&mut object, depth)?;
-
+            if !matches!(self.kind(), Some(TokenKind::Indent)) {
+                return Err(self.error(
+                    ErrorKind::InvalidIndentation,
+                    "Inline named block content must be four spaces deeper than '-'",
+                ).with_help("Inline object fields are two spaces below '-', and their named block contents are four spaces below '-'"));
+            }
+            self.expect_indent()?;
+            let value = self.parse_block(depth + 1)?;
             self.expect_dedent()?;
+            self.insert_field(&mut object, key, value, key_span)?;
+            self.parse_object_into(&mut object, depth)?;
+            self.expect_dedent()?;
+        } else {
+            self.expect_equals()?;
+            let value = self.read_value()?;
+            self.expect_newline()?;
+            self.insert_field(&mut object, key, value, key_span)?;
+
+            // Continue directly into the same object to preserve duplicate spans.
+            if matches!(self.kind(), Some(TokenKind::Indent)) {
+                self.expect_indent()?;
+                self.parse_object_into(&mut object, depth)?;
+                self.expect_dedent()?;
+            }
         }
 
         Ok(AxsValue::Object(object))

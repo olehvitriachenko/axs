@@ -1,6 +1,6 @@
 # AXS — Data Serialization Format
 
-**Specification Version:** 0.6.0-draft  
+**Grammar Version:** 2 (pre-1.0 draft)
 **Status:** Experimental  
 **Reference Implementation:** Rust
 
@@ -33,7 +33,7 @@ name = Oleh
 age = 22
 active = true
 
-address
+address:
   city = Kyiv
   country = Ukraine
 ```
@@ -145,13 +145,13 @@ These literals may be quoted to produce strings.
 
 ## 8. Objects
 
-Non-empty nested objects use indentation:
+Nonempty named objects require a colon header and indentation:
 
 ```text
-user
+user:
   name = Oleh
   age = 22
-  address
+  address:
     city = Kyiv
 ```
 
@@ -163,10 +163,10 @@ settings = {}
 
 ## 9. Arrays
 
-Arrays use hyphen-prefixed entries.
+Named arrays require a colon header and use hyphen-prefixed entries.
 
 ```text
-skills
+skills:
   - Rust
   - TypeScript
   - PostgreSQL
@@ -181,7 +181,7 @@ skills = []
 Array elements may also be objects:
 
 ```text
-users
+users:
   - name = Oleh
     age = 22
   - name = Alex
@@ -191,7 +191,7 @@ users
 Nested arrays and objects are supported:
 
 ```text
-matrix
+matrix:
   -
     - 1
     - 2
@@ -200,12 +200,48 @@ matrix
     - 4
 ```
 
+An inline object's first field may itself introduce a named block:
+
+```text
+categories:
+  - UI:
+      - MUI
+      - Tailwind
+    name = components
+```
+
+The `UI` child content is four spaces deeper than the dash. Continuation fields
+such as `name` are two spaces deeper than the dash. This is equivalent to:
+
+```text
+categories:
+  -
+    UI:
+      - MUI
+      - Tailwind
+    name = components
+```
+
+A `:` header must end after optional whitespace and must have a nonempty
+indented object or array. `key: value`, `key: []`, `key: {}`, `key::`, and bare
+named keys are invalid. Empty collections use assignments. Spaces before `:`
+are allowed; the canonical header has no space before `:`. Inline comments
+remain unsupported, including after a colon header.
+
+After an array dash, a quoted value is always scalar. For an unquoted value,
+the first `=` or `:` is structural when its trimmed prefix is a valid key.
+Otherwise it remains string content, preserving `bad key = text` and `bad key:`.
+Array strings such as `UI:` and `http://host` must be quoted. Once `=` introduces
+an assigned value, later colons, equals signs, and dashes remain literal content.
+
 ## 10. Indentation
 
 - One nesting level equals exactly two ASCII spaces.
 - Tabs are prohibited.
 - Root-level entries have no indentation.
-- Unexpected indentation is an error.
+- Unexpected indentation is an error. Increases are one level, except that
+  `- key:` requires two levels: the implicit object and its named child block.
+  Dedentation may return to the implicit object level for continuation fields.
 - Blank lines do not affect nesting.
 - The Rust implementation supports block depths 0 through 128 inclusive.
   Inline array objects count as an extra level, as in their serialized block form.
@@ -235,7 +271,9 @@ The core round-trip requirement is:
 
 Serialization is not required to preserve whitespace, comments, or original key order.
 
-The reference serializer sorts object keys lexicographically.
+The reference serializer sorts object keys lexicographically, writes `:` for
+all named nonempty collections, expands inline array objects using a bare dash,
+and quotes strings that resemble structural array entries.
 
 ## 13. Errors
 
@@ -270,4 +308,76 @@ This specification is experimental.
 
 Syntax and semantic rules may change before version 1.0.
 
-Future additions may include schemas, binary encoding, streaming, and language-specific bindings.
+The specification draft version is independent of the Rust crate version.
+The current Rust manifest remains 0.1.0. A stable 1.x release must preserve
+documented grammar, supported type mappings, and error codes; incompatible
+changes require a major release. See `../README.md` for the proposed versioning
+policy and `../RELEASE_AUDIT.md` for outstanding release conditions.
+
+## 16. Formal structural grammar
+
+This indentation-aware EBNF uses lexer tokens. `NL` is a content-line newline;
+blank/comment lines emit no tokens. `INDENT`/`DEDENT` each change one two-space
+level, and `VALUE` is the existing primitive/empty-collection syntax from above.
+The lexer classifies each entire line; delimiters inside VALUE are opaque.
+
+```ebnf
+document      = object, EOF ;
+object        = { field } ;
+field         = key, "=", VALUE, NL | key, ":", NL, INDENT, block, DEDENT ;
+block         = nonempty_object | array ;
+nonempty_object = field, { field } ;
+array         = item, { item } ;
+item          = "-", VALUE, NL
+              | "-", NL, INDENT, block, DEDENT
+              | "-", key, "=", VALUE, NL, [ INDENT, nonempty_object, DEDENT ]
+              | "-", key, ":", NL, INDENT, INDENT, block, DEDENT,
+                object, DEDENT ;
+key           = ( ASCII_LETTER | "_" ), { ASCII_LETTER | ASCII_DIGIT | "_" | "-" } ;
+```
+
+For the last item production the first INDENT is the implicit inline-object
+level; the second is the named child collection. Additional fields share the
+implicit object level. Semantic constraints prohibit duplicate keys, mixed
+array/object blocks, and depth above 128. Empty documents represent empty root
+objects; empty nested collections appear only as VALUE (`[]` or `{}`).
+
+## 17. Migration from bare blocks
+
+This is a deliberate breaking grammar change before stable 1.0. All parser
+entry points reject bare block keys, and mixed old/new syntax is invalid.
+API function signatures, primitive typing, escaping, and resource limits remain
+unchanged. `TokenKind::Colon` is a new public variant. No legacy grammar mode or
+second parser is provided.
+
+Old syntax (rejected):
+
+```axs-legacy
+user
+  name = Oleh
+skills
+  - Rust
+users
+  - name = Oleh
+    skills
+      - Rust
+```
+
+New syntax:
+
+```text
+user:
+  name = Oleh
+skills:
+  - Rust
+users:
+  - name = Oleh
+    skills:
+      - Rust
+```
+
+Add `:` to each named nonempty block header, including continuation fields in
+inline objects. Keep scalar/empty-collection assignments and bare array dashes
+unchanged. Review array strings containing a valid-key colon prefix and quote
+them when intended as text. Do not append colons inside assigned values or
+quoted strings. No automatic text-replacement migration is provided.

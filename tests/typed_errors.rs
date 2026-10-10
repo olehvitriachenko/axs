@@ -32,7 +32,7 @@ fn reports_invalid_key() {
 
 #[test]
 fn reports_invalid_indentation() {
-    let error = parse("user\n   name = Oleh").unwrap_err();
+    let error = parse("user:\n   name = Oleh").unwrap_err();
 
     assert_eq!(error.kind, ErrorKind::InvalidIndentation);
     assert_eq!(error.span.unwrap().line, 2);
@@ -48,7 +48,7 @@ fn reports_tabs() {
 
 #[test]
 fn reports_missing_nested_block() {
-    let error = parse("user").unwrap_err();
+    let error = parse("user:").unwrap_err();
 
     assert_eq!(error.kind, ErrorKind::InvalidIndentation);
     assert!(error.span.is_some());
