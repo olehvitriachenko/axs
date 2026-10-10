@@ -11,7 +11,9 @@ pub fn stringify(data: &AxsObject) -> Result<String, String> {
     stringify_typed(data).map_err(|error| error.to_string())
 }
 
-pub(crate) fn stringify_typed(data: &AxsObject) -> Result<String, AxsError> {
+/// Like [`stringify`], but returns the structured [`AxsError`] (kind, code,
+/// message) instead of its rendered string.
+pub fn stringify_typed(data: &AxsObject) -> Result<String, AxsError> {
     let mut output = String::new();
     write_object(data, 0, &mut output)?;
     // Enforce the same token budget as the reader before returning a document.

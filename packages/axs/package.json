@@ -1,0 +1,69 @@
+{
+  "name": "@axs-lang/core",
+  "version": "0.1.0",
+  "description": "Parse and serialize AXS documents in JavaScript and TypeScript using the Rust AXS core compiled to WebAssembly",
+  "keywords": [
+    "axs",
+    "serialization",
+    "configuration",
+    "parser",
+    "webassembly"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/olehvitriachenko/axs.git",
+    "directory": "packages/axs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "sideEffects": false,
+  "main": "./dist/node/node.js",
+  "types": "./dist/node/node.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "types": "./dist/node/node.d.ts",
+        "default": "./dist/node/node.js"
+      },
+      "browser": {
+        "types": "./dist/web/web.d.ts",
+        "default": "./dist/web/web.js"
+      },
+      "default": {
+        "types": "./dist/web/web.d.ts",
+        "default": "./dist/web/web.js"
+      }
+    },
+    "./node": {
+      "types": "./dist/node/node.d.ts",
+      "default": "./dist/node/node.js"
+    },
+    "./web": {
+      "types": "./dist/web/web.d.ts",
+      "default": "./dist/web/web.js"
+    },
+    "./axs_wasm_bg.wasm": "./dist/wasm/axs_wasm_bg.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "test": "node --test \"test/*.test.cjs\" \"test/*.test.mjs\"",
+    "test:package": "node scripts/test-package.mjs",
+    "prepack": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "~22.20.5",
+    "typescript": "~5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

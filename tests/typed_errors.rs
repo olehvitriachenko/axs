@@ -74,3 +74,19 @@ fn reports_invalid_quoted_string() {
     assert_eq!(error.kind, ErrorKind::InvalidString);
     assert_eq!(error.span.unwrap().column, 8);
 }
+
+#[test]
+fn typed_stringify_reports_structured_errors() {
+    use std::collections::HashMap;
+
+    let mut object = HashMap::new();
+    object.insert("bad key".to_string(), axs::AxsValue::Null);
+    let error = axs::serializer::stringify_typed(&object).unwrap_err();
+    assert_eq!(error.kind, axs::ErrorKind::InvalidKey);
+    assert_eq!(axs::stringify(&object).unwrap_err(), error.to_string());
+
+    object.clear();
+    object.insert("pi".to_string(), axs::AxsValue::Float(f64::NAN));
+    let error = axs::serializer::stringify_typed(&object).unwrap_err();
+    assert_eq!(error.kind, axs::ErrorKind::InvalidNumber);
+}

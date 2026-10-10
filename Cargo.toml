@@ -5,10 +5,16 @@ edition = "2024"
 rust-version = "1.85"
 description = "An indentation-based serialization format with structured diagnostics and checked Serde integration"
 readme = "README.md"
+repository = "https://github.com/olehvitriachenko/axs"
 license = "Apache-2.0"
 keywords = ["serialization", "serde", "configuration", "axs"]
-categories = ["encoding", "parser-implementations"]
+categories = ["encoding", "parser-implementations", "command-line-utilities"]
 include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/spec/**", "/README.md", "/PARSER_STATUS.md", "/SERDE_STATUS.md", "/RELEASE_AUDIT.md", "/CHANGELOG.md", "/LICENSE*", "/profile.axs", "/.github/workflows/ci.yml"]
+
+[workspace]
+# The root package stays the default member, so plain `cargo` commands at the
+# root still build and test only the `axs` crate.
+members = ["crates/axs-wasm"]
 
 [dependencies]
 clap = { version = "~4.5", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
@@ -18,3 +24,10 @@ tempfile = "3.23"
 
 [dev-dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
+
+# Size-oriented profile used only for the WebAssembly SDK build.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1

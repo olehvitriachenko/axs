@@ -1,0 +1,8 @@
+# Package only the manifest, grammar, language configuration, and built JavaScript.
+src/**
+node_modules/**
+out/**/*.map
+tsconfig.json
+*.vsix
+**/*.ts
+**/.DS_Store

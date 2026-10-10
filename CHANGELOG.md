@@ -22,6 +22,31 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Added
 
+- TypeScript/JavaScript SDK (`packages/axs`, provisional npm name
+  `@axs-lang/core`, `private` and unpublished): `parse`, `stringify`, `init`,
+  and a structured `AxsError`, backed by the Rust core compiled to WebAssembly.
+  The Node.js build is CommonJS with synchronous loading and works through both
+  `require` and `import`. A browser ESM build needs `await init()`. Integers
+  outside ±(2^53 − 1) map to `bigint`, unsafe integer numbers and out-of-range
+  bigints are rejected, and `-0` and float bits are preserved. Includes Node.js
+  and NestJS-style examples, a browser example, runtime tests, and a tarball
+  install test.
+- `crates/axs-wasm` (workspace member, `publish = false`): wasm-bindgen bindings
+  that exchange a versioned binary payload with the SDK, so no JSON
+  intermediate is used and Rust never calls back into user JavaScript.
+- `axs::serializer::stringify_typed` is now public: it is `stringify` with a
+  structured `AxsError` instead of a string. This is additive, and `stringify`
+  is unchanged.
+- VS Code extension (`editors/vscode`, unpublished): TextMate syntax
+  highlighting, Smart Enter list continuation, live CLI diagnostics with a
+  400 ms debounce and stale-result protection, and Format Document via
+  `axs fmt` on a temporary copy.
+- `scripts/check.sh`: local verification (fmt, Clippy, tests, doctests, crate
+  packaging, extension `npm ci` and TypeScript build) that does not depend on
+  hosted CI.
+- Release metadata: Cargo `repository` URL
+  (https://github.com/olehvitriachenko/axs), `command-line-utilities` category,
+  and RELEASE_CHECKLIST.md for the proposed 0.2.0 prerelease.
 - Replace the demonstration executable with a Clap-based `axs` CLI: `check`,
   `fmt`, `fmt --check`, `to-json`, `from-json`, help, and version support.
   Library signatures, Grammar v2, primitives, and Serde contracts are unchanged.
@@ -50,6 +75,13 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Fixed
 
+- VS Code extension: the CLI was only found at a repository-relative path,
+  which does not exist in an installed extension and lacked `.exe` on Windows;
+  it now falls back to `axs` on `PATH`, and `axs.cliPath` is a declared setting.
+  A missing CLI is reported once instead of only in the developer console.
+  Smart Enter defers to the built-in Enter with multiple cursors. Type
+  definitions are pinned to the declared VS Code 1.90 / Node 20 baseline, and
+  `.vscodeignore` keeps sources, maps, and `node_modules` out of a VSIX.
 - Excessive nesting, numeric overflow fallback, lone-quote decoding panic, and
   ambiguous array-string serialization during the preceding core milestones.
 - Release-audit diagnostics: long-line/message amplification and raw terminal
@@ -65,8 +97,8 @@ development milestone labels are not asserted to be crates.io releases.
 - Numeric buffered Serde deserialization is intentionally unsupported; nullable
   Some values are rejected to avoid information loss. See SERDE_STATUS.md.
 - Crate version was not bumped, no release tag was created, and nothing was
-  published. Apache-2.0 licensing is resolved; canonical repository metadata
-  still requires the owner's decision.
+  published. Apache-2.0 licensing is resolved, and the repository URL is set
+  from the configured Git remote.
 
 ## Proposed next versions
 

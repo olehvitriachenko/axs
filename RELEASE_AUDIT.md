@@ -310,3 +310,36 @@ References checked: [Rust 2024 / 1.85.0](https://doc.rust-lang.org/edition-guide
 [Cargo metadata requirements](https://doc.rust-lang.org/cargo/reference/manifest.html),
 [checkout action](https://github.com/actions/checkout),
 [Rust toolchain action](https://github.com/dtolnay/rust-toolchain).
+
+## Local CI and 0.2.0 prerelease preparation
+
+GitHub Actions jobs cannot start (account locked for billing). No billing change
+or paid CI was attempted. `scripts/check.sh` reproduces the workflow's Rust
+steps locally and adds the VS Code extension `npm ci` and TypeScript build.
+
+The incoming suite was rerun unchanged: **188 integration tests, two binary unit
+tests, and one README doctest** (191 total) pass on aarch64 macOS with rustc
+1.99.0 and on the actual 1.85.0 MSRV. No Rust source or test was changed.
+Clippy also passes with `--target x86_64-unknown-linux-gnu` and
+`--target x86_64-pc-windows-gnu`; this type-checks the platform-specific CLI
+tests but neither links nor runs them. No cross linker or Windows runtime is
+installed, and the Docker daemon is not running, so Linux and Windows runtime
+behavior remains **unverified**.
+
+Extension fixes: CLI discovery fell back only to `../../target/debug/axs`
+relative to the extension, which does not exist after installation and lacks
+`.exe` on Windows; it now uses the declared `axs.cliPath` setting, then the
+development build if present, then `axs` from `PATH`. A failing CLI is reported
+once to the user. Smart Enter now defers to the built-in Enter for multiple
+cursors (previously only the primary cursor was edited). `@types/vscode` had
+resolved to 1.140 although `engines.vscode` is ^1.90; it is pinned to ~1.90.0
+(and `@types/node` to Node 20) and the extension still compiles. A
+`.vscodeignore`, `vscode:prepublish`, license, and repository fields were added.
+The extension was compiled but not exercised in an Extension Development Host
+during this pass.
+
+Cargo metadata now records the repository from the configured Git remote,
+<https://github.com/olehvitriachenko/axs> (HTTP 200). On 2026-10-10 the
+crates.io API returned 404 "crate `axs` does not exist" for `axs`; that is
+availability at that moment, not a reservation. See RELEASE_CHECKLIST.md for
+remaining conditions.

@@ -207,10 +207,13 @@ columns. Conversion errors do not invent source spans.
 ## Toolchain and compatibility
 
 Minimum supported Rust version: **1.85.0** (edition 2024). The audit runs the
-locked dependency graph on that compiler, not just a newer toolchain. CI covers
-stable and 1.85.0 on Linux, macOS, and Windows. See
-[RELEASE_AUDIT.md](RELEASE_AUDIT.md) for checks actually executed and outstanding
-release conditions. The manifest remains `0.1.0`; no stable release is declared.
+locked dependency graph on that compiler, not just a newer toolchain. The
+GitHub Actions workflow defines stable and 1.85.0 jobs on Linux, macOS, and
+Windows, but it has not run yet; only macOS (aarch64) has been verified natively.
+See [RELEASE_AUDIT.md](RELEASE_AUDIT.md) and
+[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for checks actually executed and
+outstanding release conditions. The manifest remains `0.1.0`; no stable release
+is declared.
 The local path dependency above does not assume crates.io availability.
 
 Before 1.0, incompatible API/grammar policy changes should use a new minor
@@ -228,7 +231,63 @@ or CPU quotas: low-level `string::encode`, `string::decode`, and
 `value_parser::parse_value` work on individual caller-owned values without a
 byte budget. Caller-created deeply recursive AxsValue operations and custom
 Serde implementations remain the caller's responsibility. The canonical
-repository URL remains an unresolved owner decision in this checkout.
+repository is <https://github.com/olehvitriachenko/axs>.
+
+## Local checks
+
+Hosted CI is not required to verify a change. From the repository root:
+
+```sh
+scripts/check.sh
+```
+
+The script runs `cargo fmt --check`, Clippy with `-D warnings`, the locked
+workspace tests and doctests, and `cargo package`. It then builds and tests the
+TypeScript SDK (WebAssembly build, type-check, runtime tests, and a tarball
+install test), and finally runs `npm ci` and the TypeScript build for the VS
+Code extension. `--skip-sdk` and `--skip-extension` omit those parts; the SDK
+needs `rustup target add wasm32-unknown-unknown` and the `wasm-bindgen` CLI
+version locked in `Cargo.lock`. It stops at
+the first failing step and exits with that step's status. It needs a Rust
+toolchain with rustfmt and Clippy, plus Node.js and npm for the extension.
+
+## TypeScript and JavaScript
+
+`packages/axs` contains an unpublished npm package (provisional name
+`@axs-lang/core`) that runs this crate compiled to WebAssembly through the
+`crates/axs-wasm` bindings, so there's no second parser and no Rust requirement
+for its users:
+
+```ts
+import { parse, stringify } from "@axs-lang/core";
+
+const config = parse("server:\n  port = 3000\n");
+stringify({ id: 9223372036854775807n }); // "id = 9223372036854775807\n"
+```
+
+Integers outside JavaScript's safe range are returned as `bigint`, and unsafe
+integer `number`s are rejected instead of rounded. Node.js loads the module
+synchronously; browsers call `await init()` first. See
+[packages/axs/README.md](packages/axs/README.md) for the numeric policy,
+errors, tested environments, and build instructions.
+
+## VS Code extension
+
+`editors/vscode` contains an unpublished extension that provides syntax
+highlighting, Smart Enter list continuation, live diagnostics (400 ms debounce),
+and Format Document. Diagnostics and formatting run the `axs` CLI on a temporary
+copy of the document, so formatting has the same comment/order loss described
+above. The extension uses the `axs.cliPath` setting when set, otherwise
+`target/debug/axs` in a development checkout, otherwise `axs` from `PATH`.
+
+To try it, build the CLI and extension, then open the repository in VS Code and
+run the **Run AXS Extension** launch configuration:
+
+```sh
+cargo build
+npm --prefix editors/vscode ci
+npm --prefix editors/vscode run compile
+```
 
 ## License
 

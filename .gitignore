@@ -3,3 +3,7 @@
 # VS Code extension dependencies and generated output
 /editors/vscode/node_modules/
 /editors/vscode/out/
+
+# Packaged VS Code extensions and OS metadata
+/editors/vscode/*.vsix
+.DS_Store

@@ -4,6 +4,12 @@
   "description": "Language support for the AXS serialization format",
   "version": "0.1.0",
   "publisher": "axs-dev",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/olehvitriachenko/axs.git",
+    "directory": "editors/vscode"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -43,15 +49,27 @@
         "key": "enter",
         "when": "editorTextFocus && editorLangId == axs && !suggestWidgetVisible && !inSnippetMode"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "AXS",
+      "properties": {
+        "axs.cliPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "description": "Path to the axs executable. When empty, a development build in the repository target directory is used if present, otherwise axs from PATH."
+        }
+      }
+    }
   },
   "scripts": {
+    "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
-    "@types/node": "^22.20.5",
-    "@types/vscode": "^1.90.0",
+    "@types/node": "~20.19.0",
+    "@types/vscode": "~1.90.0",
     "typescript": "^5.0.0"
   }
 }

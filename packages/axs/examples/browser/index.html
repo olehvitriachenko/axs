@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AXS in the browser</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; margin: 24px; max-width: 720px; }
+      textarea, pre { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; }
+      textarea { height: 160px; }
+      pre { background: #f4f4f4; padding: 12px; white-space: pre-wrap; min-height: 3em; }
+    </style>
+  </head>
+  <body>
+    <h1>AXS in the browser</h1>
+    <p>Serve <code>packages/axs</code> over HTTP (for example
+      <code>python3 -m http.server</code>) and open <code>/examples/browser/</code>.</p>
+    <textarea id="source">server:
+  port = 3000
+  id = 9223372036854775807
+  skills:
+    - Rust
+    - TypeScript</textarea>
+    <pre id="output">Loading WebAssembly…</pre>
+    <script type="module">
+      // With a bundler, import from "@axs-lang/core" instead.
+      import { init, parse, stringify, AxsError } from "../../dist/web/web.js";
+
+      const source = document.querySelector("#source");
+      const output = document.querySelector("#output");
+
+      function render() {
+        try {
+          const value = parse(source.value);
+          const id = value.server?.id;
+          output.textContent =
+            `id: ${id} (${typeof id})\n\n` + stringify(value);
+          output.dataset.status = "ok";
+        } catch (error) {
+          output.textContent = error instanceof AxsError
+            ? `${error.code} ${error.kind} at ${error.line}:${error.column}\n${error.message}`
+            : String(error);
+          output.dataset.status = "error";
+        }
+      }
+
+      await init();
+      source.addEventListener("input", render);
+      render();
+    </script>
+  </body>
+</html>

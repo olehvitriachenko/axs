@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -27,15 +28,44 @@ function isAxs(document: vscode.TextDocument): boolean {
 function getCliPath(context: vscode.ExtensionContext): string {
   const configured = vscode.workspace
     .getConfiguration("axs")
-    .get<string>("cliPath");
+    .get<string>("cliPath")
+    ?.trim();
 
   if (configured) {
     return configured;
   }
 
-  return path.resolve(
+  // Development checkout: editors/vscode -> repository target directory.
+  const executable = process.platform === "win32" ? "axs.exe" : "axs";
+  const development = path.resolve(
     context.extensionPath,
-    "../../target/debug/axs"
+    "../../target/debug",
+    executable
+  );
+
+  if (existsSync(development)) {
+    return development;
+  }
+
+  // Installed extension: rely on an `axs` executable on PATH.
+  return "axs";
+}
+
+let reportedCliFailure = false;
+
+function reportCliFailure(error: unknown): void {
+  console.error("AXS CLI error:", error);
+
+  if (reportedCliFailure) {
+    return;
+  }
+
+  reportedCliFailure = true;
+
+  const message = error instanceof Error ? error.message : String(error);
+
+  void vscode.window.showWarningMessage(
+    `${message}. Install the AXS CLI or set "axs.cliPath".`
   );
 }
 
@@ -223,7 +253,7 @@ async function validateDocument(
     }
 
     diagnostics.delete(document.uri);
-    console.error("AXS validation error:", error);
+    reportCliFailure(error);
   }
 }
 
@@ -295,7 +325,8 @@ async function handleSmartEnter(
 
   const selection = editor.selection;
 
-  if (!selection.isEmpty) {
+  // Multiple cursors or a selection keep the built-in behavior.
+  if (editor.selections.length !== 1 || !selection.isEmpty) {
     await defaultEnter();
     return;
   }
