@@ -3,6 +3,11 @@ name = "axs"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
+description = "An indentation-based serialization format with structured diagnostics and checked Serde integration"
+readme = "README.md"
+keywords = ["serialization", "serde", "configuration", "axs"]
+categories = ["encoding", "parser-implementations"]
+include = ["/Cargo.toml", "/Cargo.lock", "/src/**", "/tests/**", "/spec/**", "/README.md", "/PARSER_STATUS.md", "/SERDE_STATUS.md", "/RELEASE_AUDIT.md", "/CHANGELOG.md", "/LICENSE*", "/profile.axs", "/.github/workflows/ci.yml"]
 
 [dependencies]
 serde = "1.0.229"

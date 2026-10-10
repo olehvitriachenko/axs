@@ -64,6 +64,11 @@ Spaces around `=` are optional:
 
 ```text
 name=Oleh
+```
+
+or equivalently:
+
+```text
 name = Oleh
 ```
 

@@ -76,26 +76,48 @@ impl AxsError {
     }
 
     pub fn render(&self, source: &str, filename: &str) -> String {
-        let mut output = format!("error[{}]: {}", self.kind.code(), self.message);
+        let mut output = format!(
+            "error[{}]: {}",
+            self.kind.code(),
+            clipped(&self.message, 1024)
+        );
 
         if let Some(span) = self.span {
             let line_number = span.line;
             let column = span.column.max(1);
 
-            output.push_str(&format!("\n  --> {filename}:{line_number}:{column}"));
+            output.push_str(&format!(
+                "\n  --> {}:{line_number}:{column}",
+                clipped(filename, 256)
+            ));
 
-            if let Some(line) = source.lines().nth(line_number.saturating_sub(1)) {
+            if source.len() > crate::lexer::MAX_INPUT_BYTES {
+                output.push_str("\n  (source excerpt omitted: document exceeds 8 MiB)");
+            } else if let Some(line) = source.lines().nth(line_number.saturating_sub(1)) {
                 let gutter_width = line_number.to_string().len();
 
                 output.push_str(&format!("\n{:width$} |", "", width = gutter_width + 1));
 
-                output.push_str(&format!("\n{line_number} | {line}"));
-
-                // Public spans may be supplied by callers; clamp rendering to the line.
+                // Crop around the marker without slicing through a UTF-8 character.
                 let line_length = line.chars().count();
                 let offset = (column - 1).min(line_length);
-                let padding = " ".repeat(offset);
-                let carets = "^".repeat(span.length.max(1).min(line_length - offset + 1));
+                let start = offset.saturating_sub(100);
+                let end = offset.saturating_add(100).min(line_length);
+                let excerpt: String = line.chars().skip(start).take(end - start).collect();
+                let prefix = if start > 0 { "... " } else { "" };
+                let suffix = if end < line_length { " ..." } else { "" };
+                output.push_str(&format!(
+                    "\n{line_number} | {prefix}{}{suffix}",
+                    escaped(&excerpt)
+                ));
+                let before: String = excerpt.chars().take(offset - start).collect();
+                let padding = " ".repeat(prefix.len() + escaped(&before).chars().count());
+                let highlighted: String = excerpt
+                    .chars()
+                    .skip(offset - start)
+                    .take(span.length.max(1))
+                    .collect();
+                let carets = "^".repeat(escaped(&highlighted).chars().count().max(1));
 
                 output.push_str(&format!(
                     "\n{:width$} | {padding}{carets}",
@@ -106,16 +128,40 @@ impl AxsError {
         }
 
         if let Some(help) = &self.help {
-            output.push_str(&format!("\nhelp: {help}"));
+            output.push_str(&format!("\nhelp: {}", clipped(help, 1024)));
         }
 
         output
     }
 }
 
+fn clipped(text: &str, max_chars: usize) -> String {
+    match text.char_indices().nth(max_chars) {
+        Some((end, _)) => format!("{}...", escaped(&text[..end])),
+        None => escaped(text),
+    }
+}
+
+fn escaped(text: &str) -> String {
+    let mut output = String::new();
+    for character in text.chars() {
+        if character.is_control() {
+            output.extend(character.escape_default());
+        } else {
+            output.push(character);
+        }
+    }
+    output
+}
+
 impl fmt::Display for AxsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error[{}]: {}", self.kind.code(), self.message)
+        write!(
+            f,
+            "error[{}]: {}",
+            self.kind.code(),
+            clipped(&self.message, 1024)
+        )
     }
 }
 

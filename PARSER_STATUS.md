@@ -147,3 +147,12 @@ values remain the caller's responsibility. Diagnostic columns do not account
 for wide glyphs or combining characters. Serialization performs a final lexical
 validation pass, so it temporarily holds output and tokens together. Fuzzing and
 broader platform/toolchain coverage remain future validation work.
+
+## Diagnostic rendering
+
+Diagnostics crop source lines to 100 Unicode scalars on either side of the
+marker, clip messages/help to 1,024 scalars and filenames to 256, and escape
+terminal controls. Display applies the same policy; original error fields and
+source-span conventions remain unchanged. Sources over 8 MiB omit excerpts.
+Low-level string/value helpers have no document budget; caller-owned deeply
+recursive AxsValue operations remain the caller's responsibility.

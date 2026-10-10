@@ -199,34 +199,39 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
         }
         let current = *indents.last().unwrap();
 
-        if depth > current {
-            if depth != current + 1 {
-                return Err(error(
-                    ErrorKind::InvalidIndentation,
-                    "Invalid indentation jump",
-                    line,
-                    spaces + 1,
-                    1,
-                )
-                .with_help("Increase indentation by one level at a time"));
+        match depth.cmp(&current) {
+            std::cmp::Ordering::Greater => {
+                if depth != current + 1 {
+                    return Err(error(
+                        ErrorKind::InvalidIndentation,
+                        "Invalid indentation jump",
+                        line,
+                        spaces + 1,
+                        1,
+                    )
+                    .with_help("Increase indentation by one level at a time"));
+                }
+
+                indents.push(depth);
+                tokens.push(token(TokenKind::Indent, line, spaces + 1));
+            }
+            std::cmp::Ordering::Less => {
+                if !indents.contains(&depth) {
+                    return Err(error(
+                        ErrorKind::InvalidIndentation,
+                        "Invalid dedentation",
+                        line,
+                        spaces + 1,
+                        1,
+                    ));
+                }
+                while *indents.last().unwrap() > depth {
+                    indents.pop();
+                    tokens.push(token(TokenKind::Dedent, line, spaces + 1));
+                }
             }
 
-            indents.push(depth);
-            tokens.push(token(TokenKind::Indent, line, spaces + 1));
-        } else if depth < current {
-            if !indents.contains(&depth) {
-                return Err(error(
-                    ErrorKind::InvalidIndentation,
-                    "Invalid dedentation",
-                    line,
-                    spaces + 1,
-                    1,
-                ));
-            }
-            while *indents.last().unwrap() > depth {
-                indents.pop();
-                tokens.push(token(TokenKind::Dedent, line, spaces + 1));
-            }
+            std::cmp::Ordering::Equal => {}
         }
 
         let column = spaces + 1;
