@@ -1,5 +1,12 @@
 use crate::error::{AxsError, ErrorKind, SourceSpan};
 
+/// Maximum block depth; root fields are at depth zero.
+pub const MAX_NESTING_DEPTH: usize = 128;
+/// Maximum UTF-8 document size, also enforced on serializer output.
+pub const MAX_INPUT_BYTES: usize = 8 * 1024 * 1024;
+/// Maximum emitted token count, including structural tokens and EOF.
+pub const MAX_TOKENS: usize = 262_144;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     Identifier(String),
@@ -35,7 +42,7 @@ fn error(kind: ErrorKind, message: &str, line: usize, column: usize, length: usi
     AxsError::new(kind, message).with_span(SourceSpan::new(line, column, length))
 }
 
-fn valid_key(key: &str) -> bool {
+pub(crate) fn valid_key(key: &str) -> bool {
     let mut chars = key.chars();
 
     let start = chars
@@ -119,6 +126,18 @@ fn emit_entry(
 }
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
+    if input.len() > MAX_INPUT_BYTES {
+        return Err(error(
+            ErrorKind::SyntaxError,
+            "Maximum input size exceeded",
+            1,
+            1,
+            1,
+        )
+        .with_help(format!(
+            "AXS supports at most {MAX_INPUT_BYTES} input bytes"
+        )));
+    }
     let mut tokens = Vec::new();
     let mut indents = vec![0usize];
 
@@ -144,6 +163,16 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
 
         let spaces = raw.chars().take_while(|c| *c == ' ').count();
 
+        if raw[spaces..].starts_with(char::is_whitespace) {
+            return Err(error(
+                ErrorKind::InvalidIndentation,
+                "Indentation must use ASCII spaces",
+                line,
+                spaces + 1,
+                1,
+            ));
+        }
+
         if spaces % 2 != 0 {
             return Err(error(
                 ErrorKind::InvalidIndentation,
@@ -156,6 +185,18 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
         }
 
         let depth = spaces / 2;
+        if depth > MAX_NESTING_DEPTH {
+            return Err(error(
+                ErrorKind::InvalidIndentation,
+                "Maximum nesting depth exceeded",
+                line,
+                spaces + 1,
+                1,
+            )
+            .with_help(format!(
+                "AXS supports at most {MAX_NESTING_DEPTH} nesting levels"
+            )));
+        }
         let current = *indents.last().unwrap();
 
         if depth > current {
@@ -171,11 +212,20 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
             }
 
             indents.push(depth);
-            tokens.push(token(TokenKind::Indent, line, 1));
+            tokens.push(token(TokenKind::Indent, line, spaces + 1));
         } else if depth < current {
+            if !indents.contains(&depth) {
+                return Err(error(
+                    ErrorKind::InvalidIndentation,
+                    "Invalid dedentation",
+                    line,
+                    spaces + 1,
+                    1,
+                ));
+            }
             while *indents.last().unwrap() > depth {
                 indents.pop();
-                tokens.push(token(TokenKind::Dedent, line, 1));
+                tokens.push(token(TokenKind::Dedent, line, spaces + 1));
             }
         }
 
@@ -217,6 +267,18 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
         }
 
         tokens.push(token(TokenKind::Newline, line, raw.chars().count() + 1));
+        if tokens.len() >= MAX_TOKENS {
+            return Err(error(
+                ErrorKind::SyntaxError,
+                "Maximum token count exceeded",
+                line,
+                column,
+                1,
+            )
+            .with_help(format!(
+                "AXS supports at most {MAX_TOKENS} tokens including EOF"
+            )));
+        }
     }
 
     let eof_line = input.lines().count() + 1;
@@ -227,6 +289,15 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, AxsError> {
     }
 
     tokens.push(token(TokenKind::Eof, eof_line, 1));
+    if tokens.len() > MAX_TOKENS {
+        return Err(error(
+            ErrorKind::SyntaxError,
+            "Maximum token count exceeded",
+            eof_line,
+            1,
+            1,
+        ));
+    }
 
     Ok(tokens)
 }

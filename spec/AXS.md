@@ -117,7 +117,14 @@ height = 1.76
 temperature = -4.5
 ```
 
-The treatment of integer overflow, floating-point overflow, and exponent notation remains under review.
+The Rust implementation rejects integer overflow and non-finite floating-point
+results with `AXS008`. Decimal floats require digits on both sides of the point
+and no leading zeros in the whole part, except for zero itself. An optional
+minus sign is supported; a plus sign is not numeric syntax. Conversion to `f64`
+uses normal binary rounding, including underflow to signed zero.
+
+Exponent notation, `NaN`, and `Infinity` are unquoted strings. The serializer
+emits decimal float notation and preserves negative floating-point zero.
 
 ## 7. Booleans and Null
 
@@ -195,6 +202,9 @@ matrix
 - Root-level entries have no indentation.
 - Unexpected indentation is an error.
 - Blank lines do not affect nesting.
+- The Rust implementation supports block depths 0 through 128 inclusive.
+  Inline array objects count as an extra level, as in their serialized block form.
+- Non-ASCII leading whitespace on content lines is invalid indentation.
 
 ## 11. Comments
 
@@ -206,6 +216,9 @@ debug = true
 ```
 
 Inline comments are not part of the current specification.
+
+`#` inside an assignment or array value is literal text. Blank and full-line
+comment lines do not change indentation; raw tabs remain prohibited everywhere.
 
 ## 12. Serialization
 
@@ -241,7 +254,10 @@ AXS is a data format, not a programming language.
 
 A parser must not execute arbitrary code contained in a document.
 
-Implementations should enforce configurable limits on document size, nesting depth, and collection length when processing untrusted input.
+The Rust implementation enforces fixed limits of 128 block levels, 8 MiB per
+input/output document, and 262,144 tokens including structural tokens and EOF.
+Resource-limit errors use `AXS002` for depth and `AXS009` for size/token count.
+See `../PARSER_STATUS.md` for the implemented grammar and known limitations.
 
 ## 15. Compatibility
 

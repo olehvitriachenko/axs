@@ -23,5 +23,5 @@ pub use serializer::stringify;
 // Data types
 pub use value::AxsValue;
 
-// Legacy parser for compatibility tests
+// Compatibility entry point with string errors
 pub use parser::parse as parse_legacy;

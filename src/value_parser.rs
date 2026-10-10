@@ -1,6 +1,39 @@
+use std::collections::HashMap;
+
 use crate::string;
 use crate::value::AxsValue;
-use std::collections::HashMap;
+
+fn unsigned_integer_syntax(value: &str) -> bool {
+    value == "0"
+        || (!value.is_empty()
+            && !value.starts_with('0')
+            && value.bytes().all(|c| c.is_ascii_digit()))
+}
+
+fn number_parts(value: &str) -> &str {
+    value.strip_prefix('-').unwrap_or(value)
+}
+
+fn integer_syntax(value: &str) -> bool {
+    unsigned_integer_syntax(number_parts(value))
+}
+
+fn float_syntax(value: &str) -> bool {
+    let digits = number_parts(value);
+
+    let Some((whole, fraction)) = digits.split_once('.') else {
+        return false;
+    };
+
+    unsigned_integer_syntax(whole)
+        && !fraction.is_empty()
+        && fraction.bytes().all(|c| c.is_ascii_digit())
+}
+
+// Used by the token parser to classify numeric errors.
+pub fn is_numeric_literal(value: &str) -> bool {
+    integer_syntax(value) || float_syntax(value)
+}
 
 pub fn parse_value(input: &str) -> Result<AxsValue, String> {
     let value = input.trim();
@@ -13,6 +46,10 @@ pub fn parse_value(input: &str) -> Result<AxsValue, String> {
         return string::decode(value).map(AxsValue::String);
     }
 
+    if value.chars().any(char::is_control) {
+        return Err("Unescaped control character in value".into());
+    }
+
     match value {
         "true" => return Ok(AxsValue::Boolean(true)),
         "false" => return Ok(AxsValue::Boolean(false)),
@@ -22,31 +59,23 @@ pub fn parse_value(input: &str) -> Result<AxsValue, String> {
         _ => {}
     }
 
-    let digits = value.strip_prefix('-').unwrap_or(value);
-
-    let is_integer = digits == "0"
-        || (!digits.starts_with('0')
-            && !digits.is_empty()
-            && digits.bytes().all(|c| c.is_ascii_digit()));
-
-    if is_integer && let Ok(n) = value.parse::<i64>() {
-        return Ok(AxsValue::Integer(n));
+    if integer_syntax(value) {
+        return value
+            .parse::<i64>()
+            .map(AxsValue::Integer)
+            .map_err(|_| format!("Integer '{value}' is outside the i64 range"));
     }
 
-    if let Some((whole, fraction)) = digits.split_once('.') {
-        let valid = (whole == "0"
-            || (!whole.is_empty()
-                && !whole.starts_with('0')
-                && whole.bytes().all(|c| c.is_ascii_digit())))
-            && !fraction.is_empty()
-            && fraction.bytes().all(|c| c.is_ascii_digit());
+    if float_syntax(value) {
+        let number = value
+            .parse::<f64>()
+            .map_err(|_| format!("Invalid floating-point number '{value}'"))?;
 
-        if valid
-            && let Ok(n) = value.parse::<f64>()
-            && n.is_finite()
-        {
-            return Ok(AxsValue::Float(n));
+        if !number.is_finite() {
+            return Err(format!("Floating-point number '{value}' is not finite"));
         }
+
+        return Ok(AxsValue::Float(number));
     }
 
     Ok(AxsValue::String(value.to_string()))

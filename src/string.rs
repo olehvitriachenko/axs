@@ -1,5 +1,5 @@
 pub fn decode(input: &str) -> Result<String, String> {
-    if !input.starts_with('"') || !input.ends_with('"') {
+    if input.len() < 2 || !input.starts_with('"') || !input.ends_with('"') {
         return Err("Expected quoted string".into());
     }
 
@@ -46,6 +46,9 @@ pub fn decode(input: &str) -> Result<String, String> {
                     }
 
                     hex.push(c);
+                    if hex.len() > 6 {
+                        return Err("Invalid Unicode escape".into());
+                    }
                 }
 
                 if !closed

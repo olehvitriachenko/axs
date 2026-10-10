@@ -91,8 +91,11 @@ impl AxsError {
 
                 output.push_str(&format!("\n{line_number} | {line}"));
 
-                let padding = " ".repeat(column - 1);
-                let carets = "^".repeat(span.length.max(1));
+                // Public spans may be supplied by callers; clamp rendering to the line.
+                let line_length = line.chars().count();
+                let offset = (column - 1).min(line_length);
+                let padding = " ".repeat(offset);
+                let carets = "^".repeat(span.length.max(1).min(line_length - offset + 1));
 
                 output.push_str(&format!(
                     "\n{:width$} | {padding}{carets}",

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::error::{AxsError, ErrorKind, SourceSpan};
-use crate::lexer::{Token, TokenKind, tokenize};
+use crate::lexer::{MAX_NESTING_DEPTH, Token, TokenKind, tokenize};
 use crate::value::AxsValue;
-use crate::value_parser::parse_value;
+use crate::value_parser::{is_numeric_literal, parse_value};
 
 type AxsObject = HashMap<String, AxsValue>;
 
@@ -11,7 +11,7 @@ pub fn parse_tokens(source: &str) -> Result<AxsObject, AxsError> {
     let tokens = tokenize(source)?;
     let mut parser = TokenParser::new(&tokens);
 
-    let object = parser.parse_object()?;
+    let object = parser.parse_object(0)?;
     parser.expect_eof()?;
 
     Ok(object)
@@ -45,7 +45,16 @@ impl<'a> TokenParser<'a> {
         let mut err = AxsError::new(kind, message);
 
         if let Some(token) = self.current() {
-            err = err.with_span(SourceSpan::new(token.span.line, token.span.column, 1));
+            err = err.with_span(SourceSpan::new(
+                token.span.line,
+                token.span.column,
+                match &token.kind {
+                    TokenKind::Identifier(raw) | TokenKind::Value(raw) => {
+                        raw.chars().count().max(1)
+                    }
+                    _ => 1,
+                },
+            ));
         }
 
         err
@@ -98,6 +107,9 @@ impl<'a> TokenParser<'a> {
             Some(TokenKind::Eof) | None => {
                 Err(self.error(ErrorKind::UnexpectedEof, "Expected identifier"))
             }
+            Some(TokenKind::Indent) => {
+                Err(self.error(ErrorKind::InvalidIndentation, "Unexpected indentation"))
+            }
             _ => Err(self.error(ErrorKind::UnexpectedToken, "Expected identifier")),
         }
     }
@@ -108,6 +120,8 @@ impl<'a> TokenParser<'a> {
                 let value = parse_value(raw).map_err(|message| {
                     let kind = if raw.starts_with('"') {
                         ErrorKind::InvalidString
+                    } else if is_numeric_literal(raw) {
+                        ErrorKind::InvalidNumber
                     } else {
                         ErrorKind::InvalidValue
                     };
@@ -167,16 +181,28 @@ impl<'a> TokenParser<'a> {
         }
     }
 
-    fn parse_object(&mut self) -> Result<AxsObject, AxsError> {
+    fn check_depth(&self, depth: usize) -> Result<(), AxsError> {
+        if depth > MAX_NESTING_DEPTH {
+            return Err(self.error(ErrorKind::InvalidIndentation, "Maximum nesting depth exceeded")
+                .with_help(format!("AXS supports at most {MAX_NESTING_DEPTH} nesting levels, including inline objects")));
+        }
+        Ok(())
+    }
+
+    fn parse_object(&mut self, depth: usize) -> Result<AxsObject, AxsError> {
         let mut object = HashMap::new();
-        self.parse_object_into(&mut object)?;
+        self.parse_object_into(&mut object, depth)?;
         Ok(object)
     }
 
     // Parse fields directly into an existing object.
     // This preserves source positions for duplicate keys.
-    fn parse_object_into(&mut self, object: &mut AxsObject) -> Result<(), AxsError> {
+    fn parse_object_into(&mut self, object: &mut AxsObject, depth: usize) -> Result<(), AxsError> {
+        self.check_depth(depth)?;
         while !matches!(self.kind(), Some(TokenKind::Dedent | TokenKind::Eof) | None) {
+            if matches!(self.kind(), Some(TokenKind::Indent)) {
+                return Err(self.error(ErrorKind::InvalidIndentation, "Unexpected indentation"));
+            }
             let key_span = self.identifier_span();
             let key = self.read_identifier()?;
 
@@ -194,7 +220,7 @@ impl<'a> TokenParser<'a> {
                     self.expect_newline()?;
                     self.expect_indent()?;
 
-                    let value = self.parse_block()?;
+                    let value = self.parse_block(depth + 1)?;
 
                     self.expect_dedent()?;
                     value
@@ -213,22 +239,28 @@ impl<'a> TokenParser<'a> {
         Ok(())
     }
 
-    fn parse_block(&mut self) -> Result<AxsValue, AxsError> {
+    fn parse_block(&mut self, depth: usize) -> Result<AxsValue, AxsError> {
         match self.kind() {
-            Some(TokenKind::Dash) => Ok(AxsValue::Array(self.parse_array()?)),
+            Some(TokenKind::Dash) => Ok(AxsValue::Array(self.parse_array(depth)?)),
 
-            Some(TokenKind::Identifier(_)) => Ok(AxsValue::Object(self.parse_object()?)),
+            Some(TokenKind::Identifier(_)) => Ok(AxsValue::Object(self.parse_object(depth)?)),
 
             _ => Err(self.error(ErrorKind::UnexpectedToken, "Expected object or array block")),
         }
     }
 
-    fn parse_array(&mut self) -> Result<Vec<AxsValue>, AxsError> {
+    fn parse_array(&mut self, depth: usize) -> Result<Vec<AxsValue>, AxsError> {
+        self.check_depth(depth)?;
         let mut array = Vec::new();
 
         while !matches!(self.kind(), Some(TokenKind::Dedent | TokenKind::Eof) | None) {
             if !matches!(self.kind(), Some(TokenKind::Dash)) {
-                return Err(self.error(ErrorKind::UnexpectedToken, "Expected '-'"));
+                let kind = if matches!(self.kind(), Some(TokenKind::Indent)) {
+                    ErrorKind::InvalidIndentation
+                } else {
+                    ErrorKind::UnexpectedToken
+                };
+                return Err(self.error(kind, "Expected '-' at the array indentation level"));
             }
 
             self.advance();
@@ -248,7 +280,7 @@ impl<'a> TokenParser<'a> {
                     self.expect_newline()?;
                     self.expect_indent()?;
 
-                    let value = self.parse_block()?;
+                    let value = self.parse_block(depth + 1)?;
 
                     self.expect_dedent()?;
                     value
@@ -256,7 +288,7 @@ impl<'a> TokenParser<'a> {
 
                 // - name = Oleh
                 //   age = 22
-                Some(TokenKind::Identifier(_)) => self.parse_inline_object()?,
+                Some(TokenKind::Identifier(_)) => self.parse_inline_object(depth + 1)?,
 
                 _ => {
                     return Err(self.error(ErrorKind::UnexpectedToken, "Invalid array element"));
@@ -269,7 +301,8 @@ impl<'a> TokenParser<'a> {
         Ok(array)
     }
 
-    fn parse_inline_object(&mut self) -> Result<AxsValue, AxsError> {
+    fn parse_inline_object(&mut self, depth: usize) -> Result<AxsValue, AxsError> {
+        self.check_depth(depth)?;
         let mut object = HashMap::new();
 
         let key_span = self.identifier_span();
@@ -287,7 +320,7 @@ impl<'a> TokenParser<'a> {
         if matches!(self.kind(), Some(TokenKind::Indent)) {
             self.expect_indent()?;
 
-            self.parse_object_into(&mut object)?;
+            self.parse_object_into(&mut object, depth)?;
 
             self.expect_dedent()?;
         }
