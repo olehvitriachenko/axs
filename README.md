@@ -96,3 +96,8 @@ or CPU quotas: low-level `string::encode`, `string::decode`, and
 byte budget. Caller-created deeply recursive AxsValue operations and custom
 Serde implementations remain the caller's responsibility. The canonical
 repository URL remains an unresolved owner decision in this checkout.
+
+## License
+
+AXS is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE)
+for the complete license text.

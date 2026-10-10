@@ -4,7 +4,7 @@ Date: 2026-10-10. Verdict: **NOT READY for a stable 1.0 release**.
 
 The audited implementation passes the checks below, including an actual MSRV
 run. No unresolved critical code defect was reproduced. Stable publication is
-still blocked by unresolved licensing/repository identity, absent native
+still blocked by unresolved repository/registry identity, absent native
 Linux/Windows CI results, and approval of the public compatibility contract.
 Nothing was published, tagged, or presented as AXS 1.0.
 
@@ -31,13 +31,13 @@ subprocess-isolated 1 MiB stack probe. Sampling is not exhaustive fuzzing.
 | ID | Severity | Finding / disposition |
 |---|---|---|
 | C0 | Critical | None reproduced in this audit. This is not a proof that none exist. |
-| H1 | High | No license or license file. Owner must choose licensing before publication/distribution. Open release blocker. |
+| H1 | High | Initially no license or license file. Resolved by the owner's explicit Apache-2.0 selection: complete unmodified official LICENSE, Cargo metadata, README section, and verified packaged license. No longer a release blocker. |
 | H2 | High | No Git remote or canonical repository URL; no native Linux/Windows CI results. Repository/registry identity and green native CI must be established before a multi-platform stable claim. Open release blocker. |
 | M1 | Medium | Long-line diagnostics allocated output proportional to the entire line and span. A 100,000-character reproducer rendered 200,084 bytes. Fixed by bounded source windows, field lengths, and markers. |
 | M2 | Medium | Diagnostic text copied raw terminal controls from untrusted source/message/filename/help. Fixed in render and Display; controls are escaped. Original error fields remain available. |
 | M3 | Medium | Numeric deserialize_any buffering, exact f32 narrowing, nullable Some rejection, and object roots are intentional restrictions with substantial interoperability consequences. Regression tests and docs agree; approve these as stable contracts before 1.0. No syntax redesign attempted. |
 | M4 | Medium | Size/token limits are not hard RSS/CPU quotas. Low-level string/value helpers have no document budget; text serialization may allocate temporary escaped text and sorted entry vectors. Bounded document workflows are tested; caller-owned oversized trees/custom implementations still need caller resource control. Documented trade-off. |
-| L1 | Low | Missing MSRV, CI, description, readme, keywords/categories, and explicit package contents. Fixed without inventing authorship or URLs. |
+| L1 | Low | Missing MSRV, CI, description, readme, keywords/categories, and explicit package contents. Fixed without inventing authorship or URLs; licensing was subsequently resolved by explicit owner selection. |
 | L2 | Low | MSRV Clippy raised comparison_chain, format_collect, and needless_lifetimes warnings. Fixed in lexer/test code, preserving tests and behavior. |
 | L3 | Low | Public lexer/token/string/primitive modules, exhaustive enums, and legacy String-error APIs enlarge the compatibility surface. Preserved; owner must include them in the eventual stable API commitment. |
 | L4 | Low | The existing demonstration binary and profile.axs are packaged. Decide whether the demonstration belongs in the stable distribution. |
@@ -119,7 +119,12 @@ contents include source/tests/spec/docs/CI and the existing demonstration; targe
 artifacts, attachments, and unrelated workspace files are excluded. The local
 archive builds successfully with packaging verification.
 
-License selection and the root license file remain unresolved owner decisions.
+`license = "Apache-2.0"` records the owner's explicit selection. Root `LICENSE`
+contains the complete, unmodified official Apache License 2.0 text, including
+its appendix and literal template placeholders. The existing `LICENSE*` include
+pattern packages it; the archived license was verified byte-for-byte against
+the root file and official download. No copyright owner or organization was
+invented, and no separate NOTICE file was added.
 
 The canonical repository remains unset because no authoritative URL exists
 in this checkout. Authors were not inferred from Git names
@@ -148,10 +153,19 @@ Native host: aarch64-apple-darwin, macOS. Stable rustc 1.99.0; MSRV rustc 1.85.0
 | `cargo check --locked --all-targets --target x86_64-unknown-linux-gnu` | Pass, compilation only |
 | `cargo check --locked --all-targets --target x86_64-pc-windows-gnu` | Pass, compilation only |
 | `cargo package --list` | Rejected dirty checkout, as expected; no existing work was committed merely to bypass this safety check |
-| `cargo package --list --allow-dirty` | Pass during the initial audit; LICENSE included in intended file list |
-| `cargo package --allow-dirty` | Pass during the initial audit with missing-URL metadata warning; local archive compilation and license contents verified |
+| `cargo package --list --allow-dirty` | Pass after licensing update; LICENSE included in intended file list |
+| `cargo package --allow-dirty` | Pass after licensing update with missing-URL metadata warning; local archive compilation and license contents verified |
 | `cargo +1.85.0 package --locked --allow-dirty` | Pass with metadata warnings during the initial audit, before licensing update; archive compiled on MSRV |
 | `git diff --check` | Pass |
+
+Licensing follow-up: reran `cargo fmt --check`,
+`cargo clippy --all-targets -- -D warnings`, `cargo test`,
+`cargo package --list --allow-dirty`, and `cargo package --allow-dirty`.
+All passed; tests remain 139 integration tests plus one README doctest.
+Only LICENSE, Cargo.toml, README.md, CHANGELOG.md, and this audit were changed
+in this follow-up. Grammar, public APIs, implementation, tests, dependencies,
+and version were preserved. Documentation contains no conflicting license
+declarations. No publication, tag, or version bump was performed.
 
 Setup executed: `rustup toolchain install 1.85.0 --profile minimal --component
 rustfmt --component clippy` and `rustup target add x86_64-unknown-linux-gnu
@@ -174,8 +188,8 @@ asserted to be published crate versions.
 
 Release blockers, in order:
 
-1. Owner chooses licensing and confirms canonical repository/crates.io identity.
-   Fill only authoritative metadata.
+1. Owner confirms canonical repository and crates.io identity; fill only
+   authoritative metadata. Apache-2.0 license selection is resolved.
 2. Commit/review the changes and execute the native six-job CI matrix. Review
    the local package contents and demonstrate the packaged API for consumers.
 3. Approve strict f32/numeric-buffering, nullable Some, enum/root, error-code,
