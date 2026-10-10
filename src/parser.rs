@@ -1,4 +1,5 @@
 use crate::value::AxsValue;
+use crate::value_parser::parse_value;
 use std::collections::HashMap;
 
 struct Line<'a> {
@@ -8,58 +9,6 @@ struct Line<'a> {
 }
 
 type AxsObject = HashMap<String, AxsValue>;
-
-pub fn parse_value(input: &str) -> Result<AxsValue, String> {
-    let value = input.trim();
-
-    if value.is_empty() {
-        return Err("Empty value".into());
-    }
-
-    if value.starts_with('"') {
-        return crate::string::decode(value).map(AxsValue::String);
-    }
-
-    match value {
-        "true" => return Ok(AxsValue::Boolean(true)),
-        "false" => return Ok(AxsValue::Boolean(false)),
-        "null" => return Ok(AxsValue::Null),
-        "[]" => return Ok(AxsValue::Array(vec![])),
-        "{}" => return Ok(AxsValue::Object(HashMap::new())),
-        _ => {}
-    }
-
-    let digits = value.strip_prefix('-').unwrap_or(value);
-    let integer = digits == "0"
-        || (!digits.starts_with('0')
-            && !digits.is_empty()
-            && digits.bytes().all(|c| c.is_ascii_digit()));
-
-    if integer {
-        if let Ok(n) = value.parse::<i64>() {
-            return Ok(AxsValue::Integer(n));
-        }
-    }
-
-    if let Some((whole, frac)) = digits.split_once('.') {
-        let valid = (whole == "0"
-            || (!whole.is_empty()
-                && !whole.starts_with('0')
-                && whole.bytes().all(|c| c.is_ascii_digit())))
-            && !frac.is_empty()
-            && frac.bytes().all(|c| c.is_ascii_digit());
-
-        if valid {
-            if let Ok(n) = value.parse::<f64>() {
-                if n.is_finite() {
-                    return Ok(AxsValue::Float(n));
-                }
-            }
-        }
-    }
-
-    Ok(AxsValue::String(value.into()))
-}
 
 pub fn parse(input: &str) -> Result<AxsObject, String> {
     let mut lines = Vec::new();
@@ -214,6 +163,7 @@ fn parse_array(lines: &[Line], pos: &mut usize, depth: usize) -> Result<Vec<AxsV
             validate_key(key, line.number)?;
 
             let mut object = HashMap::new();
+
             object.insert(
                 key.to_string(),
                 parse_value(value).map_err(|e| format!("Line {}: {e}", line.number))?,
@@ -221,7 +171,6 @@ fn parse_array(lines: &[Line], pos: &mut usize, depth: usize) -> Result<Vec<AxsV
 
             *pos += 1;
 
-            // Remaining fields of the same array object
             if *pos < lines.len() && lines[*pos].depth > depth {
                 if lines[*pos].depth != depth + 1 {
                     return Err(format!(
@@ -242,6 +191,7 @@ fn parse_array(lines: &[Line], pos: &mut usize, depth: usize) -> Result<Vec<AxsV
             array.push(AxsValue::Object(object));
         } else {
             let value = parse_value(raw).map_err(|e| format!("Line {}: {e}", line.number))?;
+
             *pos += 1;
             array.push(value);
         }

@@ -1,6 +1,6 @@
-use crate::parser::parse_value;
 use crate::string;
 use crate::value::AxsValue;
+use crate::value_parser::parse_value;
 use std::collections::HashMap;
 
 type AxsObject = HashMap<String, AxsValue>;
