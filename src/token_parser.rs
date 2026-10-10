@@ -169,7 +169,13 @@ impl<'a> TokenParser<'a> {
 
     fn parse_object(&mut self) -> Result<AxsObject, AxsError> {
         let mut object = HashMap::new();
+        self.parse_object_into(&mut object)?;
+        Ok(object)
+    }
 
+    // Parse fields directly into an existing object.
+    // This preserves source positions for duplicate keys.
+    fn parse_object_into(&mut self, object: &mut AxsObject) -> Result<(), AxsError> {
         while !matches!(self.kind(), Some(TokenKind::Dedent | TokenKind::Eof) | None) {
             let key_span = self.identifier_span();
             let key = self.read_identifier()?;
@@ -177,8 +183,10 @@ impl<'a> TokenParser<'a> {
             let value = match self.kind() {
                 Some(TokenKind::Equals) => {
                     self.expect_equals()?;
+
                     let value = self.read_value()?;
                     self.expect_newline()?;
+
                     value
                 }
 
@@ -199,16 +207,18 @@ impl<'a> TokenParser<'a> {
                 }
             };
 
-            self.insert_field(&mut object, key, value, key_span)?;
+            self.insert_field(object, key, value, key_span)?;
         }
 
-        Ok(object)
+        Ok(())
     }
 
     fn parse_block(&mut self) -> Result<AxsValue, AxsError> {
         match self.kind() {
             Some(TokenKind::Dash) => Ok(AxsValue::Array(self.parse_array()?)),
+
             Some(TokenKind::Identifier(_)) => Ok(AxsValue::Object(self.parse_object()?)),
+
             _ => Err(self.error(ErrorKind::UnexpectedToken, "Expected object or array block")),
         }
     }
@@ -224,12 +234,16 @@ impl<'a> TokenParser<'a> {
             self.advance();
 
             let value = match self.kind() {
+                // - Rust
                 Some(TokenKind::Value(_)) => {
                     let value = self.read_value()?;
                     self.expect_newline()?;
                     value
                 }
 
+                // -
+                //   - Rust
+                //   - Go
                 Some(TokenKind::Newline) => {
                     self.expect_newline()?;
                     self.expect_indent()?;
@@ -240,6 +254,8 @@ impl<'a> TokenParser<'a> {
                     value
                 }
 
+                // - name = Oleh
+                //   age = 22
                 Some(TokenKind::Identifier(_)) => self.parse_inline_object()?,
 
                 _ => {
@@ -266,15 +282,14 @@ impl<'a> TokenParser<'a> {
 
         self.insert_field(&mut object, key, value, key_span)?;
 
+        // Read additional object fields directly into the
+        // same HashMap instead of creating a temporary one.
         if matches!(self.kind(), Some(TokenKind::Indent)) {
             self.expect_indent()?;
 
-            let extra = self.parse_object()?;
-            self.expect_dedent()?;
+            self.parse_object_into(&mut object)?;
 
-            for (key, value) in extra {
-                self.insert_field(&mut object, key, value, key_span)?;
-            }
+            self.expect_dedent()?;
         }
 
         Ok(AxsValue::Object(object))
