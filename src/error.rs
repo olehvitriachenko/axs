@@ -120,3 +120,15 @@ impl fmt::Display for AxsError {
 }
 
 impl Error for AxsError {}
+
+impl serde::ser::Error for AxsError {
+    fn custom<T: fmt::Display>(message: T) -> Self {
+        Self::new(ErrorKind::InvalidValue, message.to_string())
+    }
+}
+
+impl serde::de::Error for AxsError {
+    fn custom<T: fmt::Display>(message: T) -> Self {
+        Self::new(ErrorKind::InvalidValue, message.to_string())
+    }
+}

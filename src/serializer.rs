@@ -1,3 +1,4 @@
+use crate::error::{AxsError, ErrorKind};
 use crate::lexer::{MAX_INPUT_BYTES, MAX_NESTING_DEPTH, tokenize, valid_key};
 use crate::string;
 use crate::value::AxsValue;
@@ -7,14 +8,18 @@ use std::collections::HashMap;
 type AxsObject = HashMap<String, AxsValue>;
 
 pub fn stringify(data: &AxsObject) -> Result<String, String> {
+    stringify_typed(data).map_err(|error| error.to_string())
+}
+
+pub(crate) fn stringify_typed(data: &AxsObject) -> Result<String, AxsError> {
     let mut output = String::new();
     write_object(data, 0, &mut output)?;
     // Enforce the same token budget as the reader before returning a document.
-    tokenize(&output).map_err(|error| error.to_string())?;
+    tokenize(&output)?;
     Ok(output)
 }
 
-fn write_object(object: &AxsObject, depth: usize, output: &mut String) -> Result<(), String> {
+fn write_object(object: &AxsObject, depth: usize, output: &mut String) -> Result<(), AxsError> {
     check_depth(depth)?;
     let mut entries: Vec<_> = object.iter().collect();
     entries.sort_by_key(|(key, _)| *key);
@@ -45,7 +50,7 @@ fn write_object(object: &AxsObject, depth: usize, output: &mut String) -> Result
     Ok(())
 }
 
-fn write_array(array: &[AxsValue], depth: usize, output: &mut String) -> Result<(), String> {
+fn write_array(array: &[AxsValue], depth: usize, output: &mut String) -> Result<(), AxsError> {
     check_depth(depth)?;
     let indent = "  ".repeat(depth);
 
@@ -71,11 +76,14 @@ fn write_array(array: &[AxsValue], depth: usize, output: &mut String) -> Result<
     Ok(())
 }
 
-fn encode_inline(value: &AxsValue) -> Result<String, String> {
+fn encode_inline(value: &AxsValue) -> Result<String, AxsError> {
     match value {
         AxsValue::String(text) => {
             if text.len() > MAX_INPUT_BYTES {
-                return Err("Maximum output size exceeded".into());
+                return Err(AxsError::new(
+                    ErrorKind::SyntaxError,
+                    "Maximum output size exceeded",
+                ));
             }
             if is_safe_unquoted(text) {
                 Ok(text.clone())
@@ -88,7 +96,10 @@ fn encode_inline(value: &AxsValue) -> Result<String, String> {
 
         AxsValue::Float(n) => {
             if !n.is_finite() {
-                return Err("Non-finite float is not supported".into());
+                return Err(AxsError::new(
+                    ErrorKind::InvalidNumber,
+                    "Non-finite float is not supported",
+                ));
             }
 
             let mut text = n.to_string();
@@ -101,7 +112,10 @@ fn encode_inline(value: &AxsValue) -> Result<String, String> {
             // than ever returning an encoding that changes the type or value.
             match parse_value(&text) {
                 Ok(AxsValue::Float(restored)) if restored.to_bits() == n.to_bits() => Ok(text),
-                _ => Err("Float cannot be represented in AXS decimal syntax".into()),
+                _ => Err(AxsError::new(
+                    ErrorKind::InvalidNumber,
+                    "Float cannot be represented in AXS decimal syntax",
+                )),
             }
         }
 
@@ -112,7 +126,10 @@ fn encode_inline(value: &AxsValue) -> Result<String, String> {
 
         AxsValue::Object(object) if object.is_empty() => Ok("{}".into()),
 
-        _ => Err("Nested collection requires a block".into()),
+        _ => Err(AxsError::new(
+            ErrorKind::InvalidValue,
+            "Nested collection requires a block",
+        )),
     }
 }
 
@@ -133,29 +150,37 @@ fn is_safe_unquoted(value: &str) -> bool {
     )
 }
 
-fn validate_key(key: &str) -> Result<(), String> {
+fn validate_key(key: &str) -> Result<(), AxsError> {
     if key.len() > MAX_INPUT_BYTES {
-        return Err("Maximum output size exceeded".into());
+        return Err(AxsError::new(
+            ErrorKind::SyntaxError,
+            "Maximum output size exceeded",
+        ));
     }
     if !valid_key(key) {
-        return Err(format!("Invalid AXS key: '{key}'"));
-    }
-    Ok(())
-}
-
-fn check_depth(depth: usize) -> Result<(), String> {
-    if depth > MAX_NESTING_DEPTH {
-        return Err(format!(
-            "Maximum nesting depth exceeded (at most {MAX_NESTING_DEPTH} levels)"
+        return Err(AxsError::new(
+            ErrorKind::InvalidKey,
+            format!("Invalid AXS key: '{key}'"),
         ));
     }
     Ok(())
 }
 
-fn append(output: &mut String, text: &str) -> Result<(), String> {
+fn check_depth(depth: usize) -> Result<(), AxsError> {
+    if depth > MAX_NESTING_DEPTH {
+        return Err(AxsError::new(
+            ErrorKind::InvalidIndentation,
+            format!("Maximum nesting depth exceeded (at most {MAX_NESTING_DEPTH} levels)"),
+        ));
+    }
+    Ok(())
+}
+
+fn append(output: &mut String, text: &str) -> Result<(), AxsError> {
     if text.len() > MAX_INPUT_BYTES - output.len() {
-        return Err(format!(
-            "Maximum output size exceeded (at most {MAX_INPUT_BYTES} bytes)"
+        return Err(AxsError::new(
+            ErrorKind::SyntaxError,
+            format!("Maximum output size exceeded (at most {MAX_INPUT_BYTES} bytes)"),
         ));
     }
     output.push_str(text);
