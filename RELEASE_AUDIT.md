@@ -40,7 +40,7 @@ subprocess-isolated 1 MiB stack probe. Sampling is not exhaustive fuzzing.
 | L1 | Low | Missing MSRV, CI, description, readme, keywords/categories, and explicit package contents. Fixed without inventing authorship or URLs; licensing was subsequently resolved by explicit owner selection. |
 | L2 | Low | MSRV Clippy raised comparison_chain, format_collect, and needless_lifetimes warnings. Fixed in lexer/test code, preserving tests and behavior. |
 | L3 | Low | Public lexer/token/string/primitive modules, exhaustive enums, and legacy String-error APIs enlarge the compatibility surface. Preserved; owner must include them in the eventual stable API commitment. |
-| L4 | Low | The demonstration binary and profile.axs remain packaged. Decide whether the demonstration belongs in the stable distribution. |
+| L4 | Low | The initial demonstration binary has been replaced by the explicitly requested CLI. The fixture profile.axs remains packaged. CLI behavior, JSON numeric policy, and replacement constraints need review before freezing stable target support. |
 | L5 | Low | The specification combined two whitespace alternatives with the same key in one text block, which fails as a complete document. Split into separately parseable examples; every text example now has a regression check. |
 
 ## Confirmed fixes and changed files
@@ -215,6 +215,73 @@ record the preceding audit; they are not claims of native cross-platform runtime
 verification of v2. Hosted native Linux/Windows CI remains pending. No version
 bump, publication, tag, or AXS 1.0 release is declared.
 
+## CLI milestone verification
+
+The incoming baseline was independently rerun: **158 integration tests plus
+one doctest**, all retained without edits/removal in this milestone. The
+existing demonstration main is replaced by `axs check`, `fmt`, `fmt --check`,
+`to-json`, and `from-json`; Clap derive supplies help/version. Private modules
+src/cli/{mod,files,json}.rs reuse public parse/stringify and AxsValue. No core
+library, grammar, primitive, Serde adapter, or public API code was changed.
+Cargo.toml/Cargo.lock add only Clap (derive and required CLI features),
+serde_json (arbitrary_precision/raw_value), and tempfile with their transitives.
+The manifest remains 0.1.0 and MSRV 1.85. Package includes are now anchored
+at the crate root: unanchored README.md/LICENSE* patterns otherwise capture
+unrelated editor node_modules documentation/licenses. Those files were neither
+changed nor removed; the Rust archive excludes the editor tree.
+
+File reads are bounded, UTF-8 checked, and restricted to regular files. Formatting
+uses an exclusive random same-directory tempfile, copies permissions, syncs,
+revalidates the source, and persists without a delete-first fallback. Leaf
+symlinks and changed/read-only inputs are refused for replacement. Normal
+errors clean temporary files and preserve originals. JSON uses serde_json
+borrowed RawValue fragments so integer spellings, negative zero, and duplicate
+keys are not silently lost. i64 bounds, finite floats, conservative decimal
+round-trip equivalence, canonical depth, intermediate nodes, and output bytes
+are checked before stdout. Codes 0/1/2/3 distinguish success/document/usage/I/O.
+
+On native aarch64 macOS, tests/cli.rs executes the Cargo-provided binary in
+**30 integration tests**, including a fixed-seed 64-case float/string/integer
+property loop. The complete suite now passes **188 integration tests, two binary
+unit tests, and one README doctest**. Unit tests exercise concurrent edits and
+failed revalidation after tempfile creation and verify cleanup. The Linux-only
+non-UTF-8 filename test is not run on macOS (APFS rejects such filenames); a
+Windows-only deny-delete handle test is compiled but requires Windows runtime
+CI. Unix permission/symlink/broken-pipe checks ran natively. Unicode paths and
+Unicode JSON diagnostic columns are covered on all hosts.
+
+Requested commands: `cargo fmt --check`,
+`cargo clippy --all-targets -- -D warnings`, `cargo test`, `cargo test --doc`,
+`cargo run -- --help`, `cargo run -- --version`, and
+`cargo package --allow-dirty`. All pass; package verification compiles the
+library and CLI. Cargo still warns about absent documentation/homepage/repository
+URLs. Additional exact commands: `cargo +1.85.0 fmt --check`,
+`cargo +1.85.0 clippy --locked --all-targets -- -D warnings`,
+`cargo +1.85.0 test --locked`,
+`cargo check --locked --all-targets --target x86_64-unknown-linux-gnu`,
+`cargo check --locked --all-targets --target x86_64-pc-windows-gnu`,
+`cargo package --list --allow-dirty`, and `git diff --check`. All pass against
+the CLI dependency graph and final root-anchored package list. Compilation is not
+native Windows/Linux runtime verification; hosted CI remains pending.
+
+Changed files: Cargo.toml, Cargo.lock, src/main.rs, README.md, CHANGELOG.md,
+SERDE_STATUS.md, and this audit. Added: src/cli/mod.rs, src/cli/files.rs,
+src/cli/json.rs, and tests/cli.rs. Existing core/test hashes were verified
+unchanged. Nothing was published, tagged, or version-bumped.
+
+Remaining CLI limits: one regular-file argument, no stdin/recursive/batch mode;
+conversion errors have no source spans; numeric decimal acceptance is
+conservative and does not mean arbitrary-precision storage. Permissions are
+copied, but ownership/ACLs/xattrs and hard-link relationships are not. Replacement
+requires filesystem support and may fail on Windows handles that deny deletion.
+Concurrent-edit checks are not an atomic compare-and-swap or an adversarial
+symlink-race guarantee. No directory-fsync/crash durability guarantee is made;
+a crash may leave a tempfile. Output buffering prevents partial data on document
+errors, but a failing stdout device can receive partial bytes. README documents
+these contracts. The implementation itself needs no further owner approval;
+canonical repository/registry metadata and approval of stable public/CLI/JSON
+contracts remain owner release decisions. Stable 1.0 remains **NOT READY**.
+
 ## Verdict and proposed next steps
 
 Recommend the next development version **0.2.0**, not 1.0.0 now. Manifest version
@@ -228,7 +295,7 @@ Release blockers, in order:
 2. Commit/review the changes and execute the native six-job CI matrix. Review
    the local package contents and demonstrate the packaged API for consumers.
 3. Approve strict f32/numeric-buffering, nullable Some, enum/root, error-code,
-   public-module, MSRV, and demonstration-target contracts. Document migrations
+   public-module, MSRV, CLI/JSON, and file-replacement contracts. Document migrations
    if changing them; do not silently broaden grammar for convenience.
 4. Once these pass, cut a reviewed 1.0.0-rc.1 candidate and validate representative
    downstream consumers and broader fuzz/property coverage before 1.0.0.

@@ -19,7 +19,9 @@ model retain their existing APIs. AxsValue itself has no new Serde trait impls.
 The runtime dependency is Serde with its default `std` feature. `derive` is
 only a development dependency feature; consumers enable it in their own crate.
 README's derive example is included in crate documentation and compiled as a
-doctest. No other direct dependencies or optional feature switches were added.
+doctest. The Serde milestone added no other direct dependencies or optional
+feature switches. The separate CLI now uses Clap, serde_json, and tempfile; its
+private JSON bridge does not alter the checked library adapters.
 
 ## Type mapping
 

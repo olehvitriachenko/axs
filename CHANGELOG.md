@@ -22,6 +22,21 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Added
 
+- Replace the demonstration executable with a Clap-based `axs` CLI: `check`,
+  `fmt`, `fmt --check`, `to-json`, `from-json`, help, and version support.
+  Library signatures, Grammar v2, primitives, and Serde contracts are unchanged.
+- Safe in-place formatting with same-directory temporary files, permission
+  preservation, syncing, concurrent-edit revalidation, failure cleanup, and
+  symlink refusal. Document formatting loss and OS/filesystem constraints.
+- Private serde_json/AxsValue conversion with duplicate-key detection, checked
+  i64 numbers, conservative f64 decimal round-trip checks, negative-zero
+  preservation, and input/output/depth/node budgets. No arbitrary-precision AXS
+  primitive or alternate AXS parser was introduced.
+- Executable integration coverage for CLI commands, exit codes and diagnostics,
+  JSON/data preservation, file safety, resource limits, and stdout failures;
+  binary unit tests for concurrent edits and temporary-file cleanup.
+- Anchor crate-package include patterns at the root so unrelated editor
+  node_modules README/license files do not enter the Rust archive.
 - Apache-2.0 licensing: complete official root LICENSE, Cargo license metadata,
   and README license section.
 - Serde `from_str` / `to_string` integration through the existing AxsValue tree,
