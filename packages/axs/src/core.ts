@@ -118,6 +118,8 @@ function formatMessage(code: string, details: AxsErrorDetails): string {
 export interface WasmBindings {
   parse(source: string): Uint8Array;
   stringify(payload: Uint8Array): Uint8Array;
+  check(source: string): Uint8Array;
+  format(source: string): Uint8Array;
   payloadVersion(): number;
 }
 
@@ -159,6 +161,8 @@ function isWellFormed(text: string): boolean {
 export function createApi(bindings: () => WasmBindings): {
   parse(source: string): AxsObject;
   stringify(value: object): string;
+  check(source: string): void;
+  format(source: string): string;
 } {
   let checked = false;
   const load = (): WasmBindings => {
@@ -177,22 +181,25 @@ export function createApi(bindings: () => WasmBindings): {
 
   return {
     parse(source: string): AxsObject {
-      if (typeof source !== "string") {
-        throw new TypeError("AXS source must be a string");
+      validateSource(source);
+      return new Reader(load().parse(source)).object();
+    },
+
+    check(source: string): void {
+      validateSource(source);
+      const result = load().check(source);
+      if (result[0] !== 0) {
+        throw new Reader(result).failure();
       }
-      // UTF-8 never needs fewer bytes than UTF-16 code units, so this rejects
-      // oversized input before copying it into WebAssembly memory.
-      if (source.length > MAX_INPUT_BYTES) {
-        throw sizeError();
+    },
+
+    format(source: string): string {
+      validateSource(source);
+      const result = load().format(source);
+      if (result[0] !== 0) {
+        throw new Reader(result).failure();
       }
-      // wasm-bindgen would silently replace unpaired surrogates with U+FFFD.
-      if (!isWellFormed(source)) {
-        throw new AxsError("InvalidString", {
-          reason: "Source contains an unpaired UTF-16 surrogate"
-        });
-      }
-      const result = load().parse(source);
-      return new Reader(result).object();
+      return decoder.decode(result.subarray(1));
     },
 
     stringify(value: object): string {
@@ -204,6 +211,23 @@ export function createApi(bindings: () => WasmBindings): {
       return decoder.decode(result.subarray(1));
     }
   };
+}
+
+function validateSource(source: unknown): asserts source is string {
+  if (typeof source !== "string") {
+    throw new TypeError("AXS source must be a string");
+  }
+  // UTF-8 never needs fewer bytes than UTF-16 code units, so this rejects
+  // oversized input before copying it into WebAssembly memory.
+  if (source.length > MAX_INPUT_BYTES) {
+    throw sizeError();
+  }
+  // wasm-bindgen would silently replace unpaired surrogates with U+FFFD.
+  if (!isWellFormed(source)) {
+    throw new AxsError("InvalidString", {
+      reason: "Source contains an unpaired UTF-16 surrogate"
+    });
+  }
 }
 
 function sizeError(): AxsError {

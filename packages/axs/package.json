@@ -1,6 +1,6 @@
 {
   "name": "@axs-lang/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Parse and serialize AXS documents in JavaScript and TypeScript using the Rust AXS core compiled to WebAssembly",
   "keywords": [
     "axs",
@@ -14,6 +14,10 @@
     "type": "git",
     "url": "git+https://github.com/olehvitriachenko/axs.git",
     "directory": "packages/axs"
+  },
+  "homepage": "https://github.com/olehvitriachenko/axs/tree/HEAD/packages/axs#readme",
+  "bugs": {
+    "url": "https://github.com/olehvitriachenko/axs/issues"
   },
   "engines": {
     "node": ">=22"

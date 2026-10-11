@@ -33,8 +33,8 @@ const TAG_STRING: u8 = 5;
 const TAG_ARRAY: u8 = 6;
 const TAG_OBJECT: u8 = 7;
 
-const STATUS_OK: u8 = 0;
-const STATUS_ERROR: u8 = 1;
+pub(crate) const STATUS_OK: u8 = 0;
+pub(crate) const STATUS_ERROR: u8 = 1;
 
 /// The root object is depth 0; an empty collection may sit one level below the
 /// deepest block the serializer accepts. Anything deeper is rejected while
@@ -376,6 +376,18 @@ mod tests {
         let text = crate::stringify(&parsed[1..]);
         assert_eq!(text[0], STATUS_OK);
         assert_eq!(&text[1..], b"name = AXS\n");
+
+        assert_eq!(crate::check("a:\n  - x\n"), vec![STATUS_OK]);
+        assert_eq!(crate::check("a = 1\na = 2")[0], STATUS_ERROR);
+
+        // Matches `axs fmt`: floats keep their type, keys are sorted.
+        let formatted = crate::format("b = 1.0\na = 100000000000000000000.0\nc = 2.50\n");
+        assert_eq!(formatted[0], STATUS_OK);
+        assert_eq!(
+            std::str::from_utf8(&formatted[1..]).unwrap(),
+            "a = 100000000000000000000.0\nb = 1.0\nc = 2.5\n"
+        );
+        assert_eq!(crate::format("bad")[0], STATUS_ERROR);
 
         let failed = crate::parse("name");
         assert_eq!(failed[0], STATUS_ERROR);

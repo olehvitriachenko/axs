@@ -84,6 +84,28 @@ export function parse(source: string): AxsObject {
 }
 
 /**
+ * Validates an AXS document without building a JavaScript value, like
+ * `axs check`. Returns normally for valid documents.
+ *
+ * @throws {AxsError} for invalid documents, with the core's location and code.
+ */
+export function check(source: string): void {
+  api.check(source);
+}
+
+/**
+ * Canonically formats an AXS document, producing the same text as `axs fmt`
+ * (sorted keys, canonical quoting, LF newlines). Values never pass through
+ * JavaScript numbers, so `1.0` stays a float and large floats are kept exactly.
+ * Comments, original quoting, and key order are not preserved.
+ *
+ * @throws {AxsError} for invalid documents.
+ */
+export function format(source: string): string {
+  return api.format(source);
+}
+
+/**
  * Serializes a plain object to canonical AXS text. Requires prior initialization.
  *
  * @throws {AxsError} for unsupported values or exceeded limits.

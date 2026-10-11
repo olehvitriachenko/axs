@@ -5,10 +5,15 @@ from JavaScript and TypeScript. The package runs the Rust AXS core compiled to
 WebAssembly. Grammar, validation, limits, and canonical formatting are the same
 as the Rust crate and the `axs` CLI, and you don't need Rust installed to use it.
 
-> **Status:** unpublished pre-release (0.1.0). The package name
-> `@axs-lang/core` is provisional, and the npm scope's ownership hasn't been
-> established. `"private": true` prevents accidental publication. Install it
-> from a locally built tarball (see [Building](#building)).
+> **Status:** pre-1.0. Version 0.1.0 is published on npm. This checkout is
+> **0.2.0, which is not published**: it adds `check` and `format`.
+
+The npm manifest links to this repository, this package directory, and the
+shared GitHub issue tracker. For the published API, install with
+`npm install @axs-lang/core`. To test this checkout's new API before publication,
+build and install its local tarball as described below. The VS Code extension
+uses `file:../../packages/axs` during development and bundles the SDK; after
+0.2.0 is published and tested, that dependency can use the registry version.
 
 ```ts
 import { parse, stringify } from "@axs-lang/core";
@@ -34,6 +39,8 @@ const encoded = stringify(config);
 ```ts
 function parse(source: string): AxsObject;
 function stringify(value: AxsObject | object): string;
+function check(source: string): void;    // 0.2.0+: validate like `axs check`
+function format(source: string): string; // 0.2.0+: canonical text, identical to `axs fmt`
 function init(): Promise<void>; // see "Initialization"
 class AxsError extends Error { code; kind; reason; line?; column?; length?; help?; path? }
 type AxsValue = string | number | bigint | boolean | null | AxsValue[] | AxsObject;
@@ -63,6 +70,13 @@ It throws an `AxsError` for:
 
 Getters are invoked while serializing, and exceptions they throw propagate
 unchanged.
+
+`check` validates a document without building JavaScript values and throws the
+same `AxsError` as `parse`. `format` returns exactly what `axs fmt` writes. It
+works on the Rust value tree, so unlike `stringify(parse(text))` it keeps `1.0`
+as a float and keeps integral floats beyond 2^53. Like `axs fmt`, it drops
+comments, sorts keys, and emits LF newlines. Both are tested byte-for-byte
+against the Rust CLI.
 
 ## Numbers
 
@@ -197,12 +211,12 @@ npm ci
 npm run build          # Rust -> wasm -> wasm-bindgen -> TypeScript, into dist/
 npm test               # Node.js runtime tests against dist/
 npm run test:package   # npm pack, install the tarball into fresh projects, compile and run
-npm pack               # produces axs-lang-core-0.1.0.tgz (runs the build via prepack)
+npm pack               # produces axs-lang-core-<version>.tgz (runs the build via prepack)
 ```
 
 `dist/wasm/build-info.json` records the rustc and wasm-bindgen versions and the
 SHA-256 of the shipped `.wasm`, so you can compare builds. Install the tarball
-into any project with `npm install /path/to/axs-lang-core-0.1.0.tgz`.
+into any project with `npm install /path/to/axs-lang-core-<version>.tgz`.
 
 ## License
 

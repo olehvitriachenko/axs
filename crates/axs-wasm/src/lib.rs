@@ -38,6 +38,26 @@ pub fn parse(source: &str) -> Vec<u8> {
     }
 }
 
+/// Validates AXS text, like `axs check`: an empty success envelope or an error.
+#[wasm_bindgen]
+pub fn check(source: &str) -> Vec<u8> {
+    match axs::parse(source) {
+        Ok(_) => vec![codec::STATUS_OK],
+        Err(error) => codec::encode_error(&error),
+    }
+}
+
+/// Canonically formats AXS text, like `axs fmt`: parse with [`axs::parse`] and
+/// serialize the resulting tree directly, so integer/float distinctions and
+/// exact float spellings never pass through JavaScript numbers.
+#[wasm_bindgen]
+pub fn format(source: &str) -> Vec<u8> {
+    match axs::parse(source).and_then(|object| axs::serializer::stringify_typed(&object)) {
+        Ok(text) => codec::encode_ok_text(&text),
+        Err(error) => codec::encode_error(&error),
+    }
+}
+
 /// Decodes an object payload and serializes it with the canonical AXS serializer.
 #[wasm_bindgen]
 pub fn stringify(payload: &[u8]) -> Vec<u8> {
