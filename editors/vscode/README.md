@@ -57,17 +57,29 @@ Enter continues the structure the current line started:
 
 | Line before Enter | New line |
 |---|---|
-| `skills:` | indented by 2, ready for a field or a `- ` item |
+| `skills:` | indented by 2 with `- ` for a new block |
 | `skills:` above existing `- ` items | `- ` (matches the existing items) |
 | `- Rust` | `- ` at the same indent |
 | `- ` (empty item) | removes the dash and moves out one level, which ends the list |
-| `- UI:` | indented 4 below the dash, as Grammar v2 requires |
-| `-` (bare dash) | indented by 2 for a nested collection |
+| `- UI:` | indented 4 below the dash and `- ` for a new block |
+| `-` (bare dash) | indented by 2 with `- ` for a new nested collection |
 | `- name = Oleh` | indented by 2 for the next field of that object |
 | `key = value` | same indent |
 
-A `key:` header can introduce an object or an array, so Enter doesn't add a dash
-unless the block already contains list items. Comments, multiple cursors,
+For a new `key:` block, Enter inserts two spaces and `- ` by default:
+
+```axs
+data:
+  -
+```
+
+Existing object children keep indentation without a dash; existing lists keep
+list markers. The same rule works after `- UI:` (four spaces below the dash)
+and a bare `-` (two spaces below it). To prefer objects in new blocks, set
+`"axs.smartEnter.defaultCollection": "object"` in VS Code settings; the default
+is `"array"`. Existing children override the preference. An empty `- ` followed
+by Enter exits the list. A blank list marker is a typing placeholder: fill it
+with a value or child block before validation succeeds. Comments, multiple cursors,
 selections, and Enter in the middle of a line keep VS Code's normal behavior.
 For `.axs` files the extension defaults to two-space indentation with spaces,
 since AXS doesn't allow tabs.
@@ -78,9 +90,10 @@ since AXS doesn't allow tabs.
   opens. They are removed when the file closes or switches to another language.
 - The core reports the first error in a document.
 - The AXS limits apply: 8 MiB per document, 262,144 tokens, and 128 nesting
-  levels. Validating a document near 8 MiB takes tens of milliseconds.
+  levels. Validation runs synchronously; latency depends on document size and
+  the machine.
 - The extension supports untrusted and virtual workspaces, since it never runs
-  external programs or reads other files.
+  external programs; it reads its bundled WASM file.
 - Requires VS Code 1.90 or newer.
 
 ## License

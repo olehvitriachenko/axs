@@ -4,6 +4,11 @@
 
 First Marketplace release.
 
+- Smart Enter inserts `- ` after new named blocks and nested collection
+  openers, while mirroring existing object/list children. The new
+  `axs.smartEnter.defaultCollection` setting allows an object preference.
+  Invalid odd indentation falls back to normal editor behavior.
+
 - Syntax highlighting for AXS Grammar v2: block headers (`key:`, `- key:`),
   assignments, list items, quoted strings with escapes, numbers, booleans,
   `null`, empty collections, and full-line comments. Literals are highlighted

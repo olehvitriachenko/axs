@@ -122,7 +122,9 @@ async function smartEnter(editor: vscode.TextEditor): Promise<void> {
   const plan = planEnter(
     document.lineAt(position.line).text,
     position.character,
-    nextContentLine(document, position.line)
+    nextContentLine(document, position.line),
+    vscode.workspace.getConfiguration("axs", document.uri)
+      .get<string>("smartEnter.defaultCollection", "array") === "object" ? "object" : "array"
   );
 
   switch (plan.kind) {

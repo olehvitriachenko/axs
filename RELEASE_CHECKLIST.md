@@ -56,6 +56,15 @@ The installed-VSIX smoke test previously reported 14/14 steps on macOS arm64
 with VS Code 1.140.0; see editors/vscode/RELEASE_READINESS.md. The current run
 does not invoke `--vscode-smoke` or open VS Code.
 
+## Smart Enter follow-up
+
+The subsequent 2026-10-11 editor change adds array markers for new blocks and
+`axs.smartEnter.defaultCollection`. Extension tests now pass 25/25; strict
+TypeScript checks and VSIX packaging pass. Installed VSIX checks pass 15/15
+on macOS arm64 with VS Code 1.140.0, including Undo/Redo and the new setting.
+Rust/SDK code is unchanged in this
+follow-up, so the full-suite results above remain the prior core verification.
+
 ## npm and repository linkage
 
 - Package name: `@axs-lang/core`. `repository.directory` is `packages/axs`;

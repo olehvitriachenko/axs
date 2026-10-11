@@ -22,6 +22,11 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Added
 
+- Smart Enter inserts `- ` after new named blocks and nested collection
+  openers, while mirroring existing object/list children. The new
+  `axs.smartEnter.defaultCollection` setting allows an object preference.
+  Invalid odd indentation falls back to normal editor behavior.
+
 - `@axs-lang/core` 0.2.0 (not published; 0.1.0 on npm is unchanged): `check`
   and `format`, backed by new `check`/`format` WebAssembly bindings. `format`
   serializes the Rust tree directly, so it matches `axs fmt` byte-for-byte,

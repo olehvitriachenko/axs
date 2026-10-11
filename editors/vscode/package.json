@@ -84,6 +84,25 @@
         "editor.insertSpaces": true,
         "editor.detectIndentation": false
       }
+    },
+    "configuration": {
+      "title": "AXS",
+      "properties": {
+        "axs.smartEnter.defaultCollection": {
+          "type": "string",
+          "enum": [
+            "array",
+            "object"
+          ],
+          "enumDescriptions": [
+            "Insert an indented list marker (- ) for a new block.",
+            "Insert indentation only for a new block."
+          ],
+          "default": "array",
+          "scope": "resource",
+          "description": "Collection style inserted by Enter after a new block header or bare dash. Existing child lines override this preference."
+        }
+      }
     }
   },
   "scripts": {

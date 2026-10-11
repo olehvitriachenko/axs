@@ -186,7 +186,15 @@ exports.run = async function run() {
 
   await step("Smart Enter: objects, lists, nesting, and ending lists", async () => {
     const { editor } = await scratch("server:");
-    assert.equal(await enterAt(editor, 0, 7), "server:\n  ", "header indents without a dash");
+    assert.equal(await enterAt(editor, 0, 7), "server:\n  - ", "new header starts a list");
+    assert.equal(editor.selection.active.character, 4, "cursor follows the marker");
+    await vscode.commands.executeCommand("undo");
+    assert.equal(editor.document.getText(), "server:", "Enter is one undo step");
+    await vscode.commands.executeCommand("redo");
+    assert.equal(editor.document.getText(), "server:\n  - ");
+
+    await replaceAll(editor, "server:\n  port = 1");
+    assert.equal(await enterAt(editor, 0, 7), "server:\n  \n  port = 1", "existing object keeps its style");
 
     await replaceAll(editor, "skills:\n  - Rust");
     assert.equal(await enterAt(editor, 1, 8), "skills:\n  - Rust\n  - ", "list continues");
@@ -197,16 +205,30 @@ exports.run = async function run() {
     assert.equal(await enterAt(editor, 0, 7), "skills:\n  - \n  - Rust", "header mirrors list child");
 
     await replaceAll(editor, "categories:\n  - UI:");
-    assert.equal(await enterAt(editor, 1, 7), "categories:\n  - UI:\n      ", "inline header +4");
+    assert.equal(await enterAt(editor, 1, 7), "categories:\n  - UI:\n      - ", "inline header +4");
 
     await replaceAll(editor, "matrix:\n  -");
-    assert.equal(await enterAt(editor, 1, 3), "matrix:\n  -\n    ", "bare dash opens nested");
+    assert.equal(await enterAt(editor, 1, 3), "matrix:\n  -\n    - ", "bare dash opens nested");
 
     await replaceAll(editor, "people:\n  - name = Oleh");
     assert.equal(await enterAt(editor, 1, 15), "people:\n  - name = Oleh\n    ", "inline object field");
 
     await replaceAll(editor, "  port = 1");
     assert.equal(await enterAt(editor, 0, 10), "  port = 1\n  ", "assignment keeps indent");
+  });
+
+  await step("Smart Enter object preference is read from configuration", async () => {
+    const { editor } = await scratch("data:");
+    const settings = vscode.workspace.getConfiguration("axs", editor.document.uri);
+    assert.equal(settings.get("smartEnter.defaultCollection"), "array");
+    try {
+      await settings.update("smartEnter.defaultCollection", "object", vscode.ConfigurationTarget.Global);
+      assert.equal(await enterAt(editor, 0, 5), "data:\n  ");
+      await replaceAll(editor, "data:\n  - x");
+      assert.equal(await enterAt(editor, 0, 5), "data:\n  - \n  - x", "existing list overrides object preference");
+    } finally {
+      await settings.update("smartEnter.defaultCollection", undefined, vscode.ConfigurationTarget.Global);
+    }
   });
 
   await step("Smart Enter keeps default behavior for multiple cursors", async () => {
@@ -259,4 +281,6 @@ exports.run = async function run() {
   if (failed.length > 0) {
     throw new Error(`${failed.length} smoke test step(s) failed`);
   }
+  // Shut down only this isolated test instance after its report is persisted.
+  await vscode.commands.executeCommand("workbench.action.quit");
 };

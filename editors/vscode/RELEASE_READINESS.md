@@ -10,6 +10,18 @@ in 234 seconds: 198 Rust tests, 32 SDK tests, 23 extension tests, npm tarball
 installation, and the exact 10-file VSIX allow-list. Historical timing figures
 below describe the earlier audit, not a performance guarantee.
 
+## Smart Enter follow-up (2026-10-11)
+
+New block headers and bare nested openers insert an indented `- ` by default.
+Existing object/list children override the preference; set
+`axs.smartEnter.defaultCollection` to `object` for indentation-only new blocks.
+Odd indentation falls back to normal Enter. Unit/runtime tests: 25/25 pass;
+strict typecheck and VSIX packaging pass. Installed-host checks pass 15/15
+on VS Code 1.140.0 (macOS arm64), including clean shutdown of the isolated
+test instance. The installed-host test covers the
+marker/cursor, one-step Undo/Redo, object/list inference, and resource settings.
+The original audit below describes the earlier behavior and measurements.
+
 ## What changed for the release
 
 - **No Rust or CLI needed.** Validation and formatting call `check()` and
@@ -31,7 +43,7 @@ below describe the earlier audit, not a performance guarantee.
   which discarded the nested `editor.edit` and `default:type` calls. This was
   found by the installed-extension smoke test and fixed by registering a
   plain command.
-- **Changed Smart Enter:** a `key:` header no longer forces `- `. Enter
+- **Initial Smart Enter (superseded above):** a `key:` header no longer forces `- `. Enter
   continues the structure the current line started. After a header it adds a
   dash only if the block's existing first child is a list item. An empty
   `- ` item ends the list and outdents.

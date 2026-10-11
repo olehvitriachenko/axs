@@ -1,22 +1,23 @@
 // Smart Enter for AXS, kept free of the `vscode` module so it can be unit tested.
 //
-// Strategy: Enter continues the structure the current line started, and never
-// guesses between an object and an array where AXS allows both.
+// Strategy: Enter mirrors existing children; a new block uses the configured
+// collection style (arrays by default). This is an editing preference, not grammar.
 //
 // | Current line (cursor at end) | Result                                         |
 // |------------------------------|------------------------------------------------|
-// | `key:`                       | new line indented +2 (no dash)                 |
-// | `- key:`                     | new line indented +4, below the key (no dash)  |
-// | `-` (bare nested opener)     | new line indented +2 (no dash)                 |
+// | `key:`                       | new line indented +2, with `- ` by default   |
+// | `- key:`                     | new line indented +4, with `- ` by default   |
+// | `-` (bare nested opener)     | new line indented +2, with `- ` by default   |
 // | `- value`                    | new line `- ` at the same indent               |
 // | `- key = value`              | new line indented +2 (next inline-object field)|
 // | `- ` (empty item)            | dash removed, line outdented one level         |
 // | `key = value`                | new line at the same indent                    |
 //
-// After a header (`key:`, `- key:`, `-`), a dash is inserted only when the
-// existing first child below it is already a list item, so typing a new first
-// line into an existing list or object keeps its style. Comments, blank lines,
-// and Enter with text after the cursor use the editor's default behavior.
+// Existing children override the preference, so adding a field to an object
+// never inserts a list marker. Comments, invalid indentation, and Enter with
+// text after the cursor use the editor's default behavior.
+
+export type CollectionStyle = "array" | "object";
 
 export type EnterPlan =
   | { kind: "default" }
@@ -42,11 +43,13 @@ const INDENT = 2;
  * @param character Cursor offset in UTF-16 code units.
  * @param nextContentLine The next line below that is neither blank nor a
  *   comment, if any. Used to mirror an existing block's first child.
+ * @param defaultCollection Style for a new block without existing children.
  */
 export function planEnter(
   line: string,
   character: number,
-  nextContentLine?: string
+  nextContentLine?: string,
+  defaultCollection: CollectionStyle = "array"
 ): EnterPlan {
   const before = line.slice(0, character);
   const after = line.slice(character);
@@ -58,14 +61,14 @@ export function planEnter(
   const indent = /^ */.exec(before)?.[0].length ?? 0;
   const content = before.slice(indent);
 
-  if (content.trim() === "" || content.startsWith("#") || content.includes("\t")) {
+  if (content.trim() === "" || content.startsWith("#") || content.includes("\t") || indent % INDENT !== 0) {
     return { kind: "default" };
   }
 
   const header = (childIndent: number): EnterPlan => ({
     kind: "insert",
     text: `\n${" ".repeat(childIndent)}${
-      startsList(nextContentLine, childIndent) ? "- " : ""
+      childIsList(nextContentLine, childIndent, defaultCollection) ? "- " : ""
     }`
   });
 
@@ -101,10 +104,16 @@ export function planEnter(
   return { kind: "insert", text: `\n${" ".repeat(indent)}` };
 }
 
-function startsList(line: string | undefined, childIndent: number): boolean {
-  if (line === undefined) return false;
-  const indent = /^ */.exec(line)?.[0].length ?? 0;
-  return indent === childIndent && LIST_ITEM.test(line.slice(indent));
+function childIsList(
+  line: string | undefined,
+  childIndent: number,
+  defaultCollection: CollectionStyle
+): boolean {
+  if (line !== undefined) {
+    const indent = /^ */.exec(line)?.[0].length ?? 0;
+    if (indent === childIndent) return LIST_ITEM.test(line.slice(indent));
+  }
+  return defaultCollection === "array";
 }
 
 /** Returns true for lines that `nextContentLine` should skip. */
