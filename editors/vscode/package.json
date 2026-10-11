@@ -1,22 +1,42 @@
 {
   "name": "axs-language",
   "displayName": "AXS Language",
-  "description": "Language support for the AXS serialization format",
+  "description": "Syntax highlighting, live diagnostics, canonical formatting, and smart list editing for AXS files. No Rust or CLI installation required.",
   "version": "0.1.0",
-  "publisher": "axs-dev",
+  "publisher": "reaxios",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/olehvitriachenko/axs.git",
     "directory": "editors/vscode"
   },
+  "homepage": "https://github.com/olehvitriachenko/axs#readme",
+  "bugs": {
+    "url": "https://github.com/olehvitriachenko/axs/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Formatters",
+    "Linters"
   ],
-  "main": "./out/extension.js",
+  "keywords": [
+    "axs",
+    "configuration",
+    "config",
+    "serialization",
+    "data format",
+    "formatter"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "main": "./dist/extension.js",
   "contributes": {
     "languages": [
       {
@@ -50,26 +70,39 @@
         "when": "editorTextFocus && editorLangId == axs && !suggestWidgetVisible && !inSnippetMode"
       }
     ],
-    "configuration": {
-      "title": "AXS",
-      "properties": {
-        "axs.cliPath": {
-          "type": "string",
-          "default": "",
-          "scope": "machine-overridable",
-          "description": "Path to the axs executable. When empty, a development build in the repository target directory is used if present, otherwise axs from PATH."
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "axs.continueList",
+          "when": "false"
         }
+      ]
+    },
+    "configurationDefaults": {
+      "[axs]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false
       }
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "vscode:prepublish": "npm run build",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test": "node scripts/test.mjs",
+    "test:host": "node scripts/smoke-test.mjs",
+    "package": "vsce package --no-dependencies",
+    "watch": "node scripts/build.mjs --watch"
   },
   "devDependencies": {
+    "@axs-lang/core": "file:../../packages/axs",
     "@types/node": "~20.19.0",
     "@types/vscode": "~1.90.0",
-    "typescript": "^5.0.0"
+    "@vscode/vsce": "~4.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.0.0",
+    "vscode-oniguruma": "~2.0.1",
+    "vscode-textmate": "~9.3.2"
   }
 }

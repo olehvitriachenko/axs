@@ -3,6 +3,8 @@
 # VS Code extension dependencies and generated output
 /editors/vscode/node_modules/
 /editors/vscode/out/
+/editors/vscode/dist/
+/editors/vscode/out-test/
 
 # Packaged VS Code extensions and OS metadata
 /editors/vscode/*.vsix

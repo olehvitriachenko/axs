@@ -1,17 +1,14 @@
-
 {
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "AXS: Compile Extension",
+      "label": "AXS: Build Extension",
       "type": "shell",
-      "command": "npm run compile",
+      "command": "npm run build",
       "options": {
         "cwd": "${workspaceFolder}/editors/vscode"
       },
-      "problemMatcher": [
-        "$tsc"
-      ],
+      "problemMatcher": [],
       "group": "build"
     }
   ]

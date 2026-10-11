@@ -1,8 +1,10 @@
-# Package only the manifest, grammar, language configuration, and built JavaScript.
-src/**
-node_modules/**
-out/**/*.map
-tsconfig.json
-*.vsix
-**/*.ts
-**/.DS_Store
+# Allow-list: package only what the installed extension needs at runtime.
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!language-configuration.json
+!syntaxes/axs.tmLanguage.json
+!dist/extension.js
+!dist/axs_wasm_bg.wasm
