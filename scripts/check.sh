@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Local CI for AXS: Rust checks, crate packaging, the TypeScript SDK, and the VS Code extension.
 #
-# Usage: scripts/check.sh [--skip-sdk] [--skip-extension]
+# Usage: scripts/check.sh [--skip-sdk] [--skip-extension] [--vscode-smoke]
 # Requires: cargo (with rustfmt and clippy); node and npm unless both are skipped;
 # for the SDK, the wasm32-unknown-unknown target and the locked wasm-bindgen CLI.
+# The extension bundles the SDK built in packages/axs. --vscode-smoke also
+# installs the VSIX into a local VS Code and runs the in-editor smoke test
+# (opens a VS Code window).
 # Exits with the status of the first failing step.
 
 set -euo pipefail
@@ -13,12 +16,14 @@ cd "$root"
 
 skip_extension=0
 skip_sdk=0
+vscode_smoke=0
 for argument in "$@"; do
     case "$argument" in
         --skip-extension) skip_extension=1 ;;
         --skip-sdk) skip_sdk=1 ;;
+        --vscode-smoke) vscode_smoke=1 ;;
         -h | --help)
-            sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -96,19 +101,25 @@ else
     require npm
     printf '\nNode: %s, npm: %s\n' "$(node --version)" "$(npm --version)"
     extension="$root/editors/vscode"
-    if [ -f "$extension/package-lock.json" ]; then
-        step "Extension dependencies" npm --prefix "$extension" ci --no-audit --no-fund
-    else
-        step "Extension dependencies" npm --prefix "$extension" install --no-audit --no-fund
-    fi
-    step "Extension TypeScript" npm --prefix "$extension" run compile
-    current="Extension entrypoint"
-    main="$(cd "$extension" && node -p 'require("./package.json").main')"
-    if [ ! -f "$extension/$main" ]; then
-        echo "error: package.json main does not exist after compilation: $main" >&2
+    step "Extension dependencies" npm --prefix "$extension" ci --no-audit --no-fund
+    step "Extension typecheck" npm --prefix "$extension" run typecheck
+    step "Extension tests (Smart Enter, positions, grammar, WebAssembly runtime)" npm --prefix "$extension" test
+    step "Extension VSIX package" npm --prefix "$extension" run package
+    current="Extension VSIX contents"
+    vsix="$(ls "$extension"/*.vsix | head -n 1)"
+    contents="$(unzip -Z1 "$vsix" | sort)"
+    expected="$(printf '%s\n' '[Content_Types].xml' extension.vsixmanifest extension/LICENSE.txt \
+        extension/changelog.md extension/dist/axs_wasm_bg.wasm extension/dist/extension.js \
+        extension/language-configuration.json extension/package.json extension/readme.md \
+        extension/syntaxes/axs.tmLanguage.json | sort)"
+    if [ "$contents" != "$expected" ]; then
+        printf 'error: unexpected VSIX contents:\n%s\n' "$contents" >&2
         exit 1
     fi
-    printf '%sok%s: %s (%s)\n' "$green" "$reset" "$current" "$main"
+    printf '%sok%s: %s (%s)\n' "$green" "$reset" "$current" "$(basename "$vsix")"
+    if [ "$vscode_smoke" -eq 1 ]; then
+        step "Installed-extension smoke test in VS Code" node "$extension/scripts/smoke-test.mjs" --vsix "$vsix"
+    fi
 fi
 
 current=''

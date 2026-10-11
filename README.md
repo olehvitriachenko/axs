@@ -253,8 +253,9 @@ toolchain with rustfmt and Clippy, plus Node.js and npm for the extension.
 
 ## TypeScript and JavaScript
 
-`packages/axs` contains an unpublished npm package (provisional name
-`@axs-lang/core`) that runs this crate compiled to WebAssembly through the
+`packages/axs` contains the `@axs-lang/core` npm package. The current SDK
+checkout is 0.2.0; npm currently reports 0.1.0. The SDK runs this crate compiled
+to WebAssembly through the
 `crates/axs-wasm` bindings, so there's no second parser and no Rust requirement
 for its users:
 
@@ -273,20 +274,23 @@ errors, tested environments, and build instructions.
 
 ## VS Code extension
 
-`editors/vscode` contains an unpublished extension that provides syntax
-highlighting, Smart Enter list continuation, live diagnostics (400 ms debounce),
-and Format Document. Diagnostics and formatting run the `axs` CLI on a temporary
-copy of the document, so formatting has the same comment/order loss described
-above. The extension uses the `axs.cliPath` setting when set, otherwise
-`target/debug/axs` in a development checkout, otherwise `axs` from `PATH`.
+`editors/vscode` contains the **AXS Language** extension (0.1.0, not yet
+published). It provides syntax highlighting, Smart Enter, live diagnostics
+(400 ms debounce), and Format Document. Validation and formatting run this
+crate compiled to WebAssembly and bundled into the extension, so users need
+neither Rust nor the `axs` CLI. Formatting output is identical to `axs fmt`.
+See [editors/vscode/README.md](editors/vscode/README.md) and
+[editors/vscode/RELEASE_READINESS.md](editors/vscode/RELEASE_READINESS.md).
 
-To try it, build the CLI and extension, then open the repository in VS Code and
-run the **Run AXS Extension** launch configuration:
+To build and try it, build the SDK first (it supplies the WebAssembly core),
+then open the repository in VS Code and run the **Run AXS Extension** launch
+configuration:
 
 ```sh
-cargo build
+npm --prefix packages/axs ci && npm --prefix packages/axs run build
 npm --prefix editors/vscode ci
-npm --prefix editors/vscode run compile
+npm --prefix editors/vscode test
+npm --prefix editors/vscode run package   # produces axs-language-0.1.0.vsix
 ```
 
 ## License

@@ -22,8 +22,19 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Added
 
-- TypeScript/JavaScript SDK (`packages/axs`, provisional npm name
-  `@axs-lang/core`, `private` and unpublished): `parse`, `stringify`, `init`,
+- `@axs-lang/core` 0.2.0 (not published; 0.1.0 on npm is unchanged): `check`
+  and `format`, backed by new `check`/`format` WebAssembly bindings. `format`
+  serializes the Rust tree directly, so it matches `axs fmt` byte-for-byte,
+  which `stringify(parse(text))` cannot do because `1.0` would become `1`.
+  It is tested against the CLI.
+- VS Code extension prepared for its first Marketplace release (0.1.0, not
+  published). Validation and formatting now run the bundled WebAssembly core,
+  so Rust and the `axs` CLI are no longer needed. The extension is bundled with
+  esbuild, packaged with an allow-listed VSIX, and covered by unit, grammar,
+  and WebAssembly runtime tests plus an installed-VSIX smoke test in VS Code.
+  See editors/vscode/RELEASE_READINESS.md.
+- TypeScript/JavaScript SDK (`packages/axs`, npm name
+  `@axs-lang/core`): `parse`, `stringify`, `init`,
   and a structured `AxsError`, backed by the Rust core compiled to WebAssembly.
   The Node.js build is CommonJS with synchronous loading and works through both
   `require` and `import`. A browser ESM build needs `await init()`. Integers
@@ -75,6 +86,12 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Fixed
 
+- VS Code Smart Enter edits were silently dropped in the real editor:
+  `registerTextEditorCommand` ran the handler inside its own edit transaction.
+  Smart Enter also inserted `- ` after every `key:` header, even in objects.
+  It now mirrors the block's existing children, and an empty `- ` item ends
+  the list. Highlighting no longer colors `true` or numbers inside unquoted
+  strings.
 - VS Code extension: the CLI was only found at a repository-relative path,
   which does not exist in an installed extension and lacked `.exe` on Windows;
   it now falls back to `axs` on `PATH`, and `axs.cliPath` is a declared setting.
