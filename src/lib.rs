@@ -26,7 +26,7 @@ pub use token_parser::parse_tokens as parse;
 pub use serializer::stringify;
 
 // Data types
-pub use value::AxsValue;
+pub use value::{AxsObject, AxsValue};
 
 // Compatibility entry point with string errors
 pub use parser::parse as parse_legacy;

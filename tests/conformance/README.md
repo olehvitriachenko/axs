@@ -1,7 +1,7 @@
 # AXS Grammar v3 conformance fixtures
 
-Normative examples for [spec/AXS.md](../../spec/AXS.md). They are not yet run by
-the test suite: the crate still implements Grammar v2 until the v3 parser lands.
+Normative examples for [spec/AXS.md](../../spec/AXS.md), run by
+`tests/conformance.rs`.
 
 - `valid/NAME.axs` must parse to the value in `valid/NAME.json`. Object key
   order in the JSON is significant. A JSON number with a fraction or exponent

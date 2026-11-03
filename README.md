@@ -1,49 +1,43 @@
 # AXS
 
-AXS is a UTF-8, indentation-based data serialization format. Documents have an
-object root; nonempty objects and arrays use blocks, and indentation is two
-ASCII spaces per level. The Rust implementation includes a parser, deterministic
-serializer, structured diagnostics, and Serde integration.
+AXS is a compact, indentation-based data format with the JSON data model,
+designed for data that language models read and write: tool results,
+structured output, and context. The Rust implementation includes a parser,
+deterministic serializer, structured diagnostics, and Serde integration.
 
-Grammar v2 requires `:` on every named nonempty block:
+Grammar v3 (see [the specification](spec/AXS.md)):
 
 ```text
-user:
-  name = Oleh
-  age = 22
-skills:
-  - Rust
+name: Oleh
+tags[3]: [rust, typescript, llm]
+users[2]{id, name, active}:
+  - 1, Oleh, true
+  - 2, Alex, false
+profile:
+  city: Kyiv
+  bio: |
+    Two lines of text,
+    no escapes needed.
 categories:
   - UI:
       - MUI
       - Tailwind
+    name: components
 ```
 
-`=` assigns primitive values or empty collections (`[]`, `{}`). A bare `-`
-introduces an unnamed nested collection. In `- UI:`, the child content is four
-spaces deeper than the dash; sibling object fields are two spaces deeper.
-Quoted strings may contain `:`, `=`, and `-` as literal text. Quote array strings
-such as `UI:` or `http://host` so they are not classified as inline object headers.
+- `key: value` for scalars, `key:` plus an indented block for nested objects
+  and arrays, two spaces per level.
+- `[a, b]` inline arrays of primitives, `|` text blocks for multiline strings.
+- Tables (`key{a, b}:` with `- x, y` rows) for arrays of uniform objects, which
+  JSON spends most of its tokens on.
+- Optional checked lengths (`key[N]`) let a reader detect truncated output.
+- Keys keep their order. Keys that are not `[A-Za-z_][A-Za-z0-9_.-]*` are quoted
+  (`"@id": x`). Floats may use exponents (`1.5e-7`).
 
-This deliberately breaks the old grammar before 1.0. For example:
-
-```axs-legacy
-user
-  name = Oleh
-```
-
-must become:
-
-```text
-user:
-  name = Oleh
-```
-
-Bare named keys and documents mixing bare and colon block headers are rejected,
-including through `parse_legacy` (which preserves its signature only). See
-[the specification](spec/AXS-v2.md) for the formal grammar and migration examples.
-Public `TokenKind` adds `Colon`; exhaustive matches must handle it. Rust API
-signatures, primitive typing, string escaping, and resource limits are retained.
+The serializer picks the most compact exact form (table, inline array, or
+block) and always writes lengths. Grammar v3 replaces Grammar v2
+([AXS-v2.md](spec/AXS-v2.md)) without a migration mode: `key = value` and other
+v2 syntax are rejected. Normative examples live in `tests/conformance/`.
 
 In a consuming crate, add `axs` and enable Serde's derive feature:
 
@@ -127,6 +121,7 @@ Or use `cargo run -- <command> <file>` during development:
 axs check config.axs
 axs fmt --check config.axs
 axs fmt config.axs
+axs fmt --sort-keys config.axs
 axs to-json config.axs > converted.json
 axs from-json config.json > converted.axs
 axs check --help
@@ -149,10 +144,11 @@ a shell can truncate a redirected file before the CLI reads it.
 | 2 | Invalid/missing command-line arguments |
 | 3 | File/read/write/replacement error, including a broken stdout pipe |
 
-Formatting uses the library's canonical Grammar v2 serializer: sorted keys,
-colon block headers, expanded array objects, canonical quoting, and LF newlines.
-**Comments, whitespace, original quoting, and input key order are lost.** Parsed
-values and their types are retained. Empty documents format to empty files.
+Formatting uses the library's canonical Grammar v3 serializer: input key order
+(or lexicographic order with `--sort-keys`), tables, inline arrays, text blocks,
+lengths on every array, canonical quoting, and LF newlines. **Comments,
+whitespace, and original quoting are lost.** Parsed values and their types are
+retained. Empty documents format to empty files.
 Canonical files are not rewritten.
 
 In-place formatting validates and serializes fully before creating a random,
@@ -262,8 +258,8 @@ for its users:
 ```ts
 import { parse, stringify } from "@axs-lang/core";
 
-const config = parse("server:\n  port = 3000\n");
-stringify({ id: 9223372036854775807n }); // "id = 9223372036854775807\n"
+const config = parse("server:\n  port: 3000\n");
+stringify({ id: 9223372036854775807n }); // "id: 9223372036854775807\n"
 ```
 
 Integers outside JavaScript's safe range are returned as `bigint`, and unsafe

@@ -24,11 +24,14 @@ struct Arguments {
 enum Command {
     /// Validate an AXS file without modifying it.
     Check { file: PathBuf },
-    /// Canonically format an AXS file; comments and original ordering are lost.
+    /// Canonically format an AXS file; comments are lost, key order is kept.
     Fmt {
         /// Report noncanonical formatting without modifying the file.
         #[arg(long)]
         check: bool,
+        /// Sort object keys lexicographically instead of keeping their order.
+        #[arg(long)]
+        sort_keys: bool,
         file: PathBuf,
     },
     /// Write JSON to stdout from an AXS file.
@@ -99,11 +102,16 @@ fn run(command: Command) -> Result<(), Failure> {
         let encoded = axs::stringify(&tree).map_err(|message| Failure { code: 1, message })?;
         return stdout(encoded.as_bytes());
     }
-    let tree = axs::parse(&loaded.source)
+    let mut tree = axs::parse(&loaded.source)
         .map_err(|error| Failure::document(error, &loaded.source, path))?;
     match command {
         Command::Check { .. } => Ok(()),
-        Command::Fmt { check, .. } => {
+        Command::Fmt {
+            check, sort_keys, ..
+        } => {
+            if sort_keys {
+                axs::value::sort_keys(&mut tree);
+            }
             let encoded = axs::stringify(&tree).map_err(|message| Failure { code: 1, message })?;
             if encoded == loaded.source {
                 return Ok(());

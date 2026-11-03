@@ -1,7 +1,7 @@
 # AXS — Data Format for Language Models
 
 **Grammar Version:** 3 (pre-1.0 draft)
-**Status:** Experimental, not yet implemented (the Rust crate implements [Grammar v2](AXS-v2.md))
+**Status:** Experimental, implemented by the Rust crate
 **Reference Implementation:** Rust
 
 ## 1. Overview
@@ -118,8 +118,13 @@ A string must be quoted when it:
 - is exactly `|`;
 - contains a control character (including LF, CR, and tab), unless it is
   written as a text block (§8);
-- appears in an inline array or table cell and contains `,`, or begins with `-`
-  followed by a space (see §9 and §10).
+- appears in an inline array or table cell and contains `,`, `[`, or `]`
+  (see §9 and §10);
+- appears as a `- ` array item and would read as an object field, such as
+  `UI:` or `note: x` (see §9).
+
+Inside inline arrays and table cells only a leading `"` starts a quoted
+string, so `a"b` is an ordinary unquoted element.
 
 ### Quoted strings
 
@@ -164,9 +169,11 @@ optional sign, and one or more digits. Results must be finite; overflow is an
 error, underflow rounds to signed zero. `NaN`, `Infinity`, `00123`, `.5`, and
 `+1` are unquoted strings.
 
-The canonical serializer writes the shortest decimal form that round-trips,
-using exponent notation only when it is shorter, and preserves `-0.0`. A float
-with an integral value keeps a fractional part (`1.0`), so it stays a float.
+The canonical serializer writes the shortest digits that round-trip. As in
+JavaScript, it uses exponent notation (`1.5e-7`, `1e21`) only when the magnitude
+is below `1e-6` or at least `1e21`, and plain decimals otherwise. It preserves
+`-0.0`. A decimal float with an integral value keeps a fractional part (`1.0`),
+so it stays a float.
 
 ## 7. Booleans and null
 
@@ -395,8 +402,8 @@ should report line and column. Error categories:
 - Invalid key, duplicate key
 - Invalid indentation, mixed array/object block, empty block
 - Invalid escape or unterminated string
-- Malformed inline array, table header, or table row (wrong cell count)
-- Array length mismatch
+- Malformed inline array, table header, or table row (wrong cell count) — `AXS011`
+- Array length mismatch — `AXS010`
 - Invalid or empty text block
 - Unsupported numeric value (overflow, non-finite)
 - Resource limit exceeded

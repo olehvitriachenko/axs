@@ -29,6 +29,8 @@ pub enum ErrorKind {
     InvalidString,
     InvalidNumber,
     SyntaxError,
+    LengthMismatch,
+    InvalidCollection,
 }
 
 impl ErrorKind {
@@ -43,6 +45,8 @@ impl ErrorKind {
             Self::InvalidString => "AXS007",
             Self::InvalidNumber => "AXS008",
             Self::SyntaxError => "AXS009",
+            Self::LengthMismatch => "AXS010",
+            Self::InvalidCollection => "AXS011",
         }
     }
 }

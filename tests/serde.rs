@@ -33,7 +33,7 @@ fn simple_and_nested_structs_roundtrip() {
         age: 22,
         active: true,
         nickname: None,
-        skills: vec!["Rust".into(), "name = value".into()],
+        skills: vec!["Rust".into(), "name: value".into()],
         address: Address {
             city: "Київ".into(),
             zip: "00123".into(),
@@ -112,7 +112,7 @@ fn all_externally_tagged_enum_variants_roundtrip() {
         values: vec![
             Event::Idle,
             Event::Count(8),
-            Event::Pair("a=b".into(), true),
+            Event::Pair("a: b".into(), true),
             Event::Record {
                 name: "null".into(),
                 values: vec![1, 2],
@@ -123,7 +123,7 @@ fn all_externally_tagged_enum_variants_roundtrip() {
         ],
     };
     roundtrip(&events);
-    assert_eq!(to_string(&Event::Count(3)).unwrap(), "renamed = 3\n");
+    assert_eq!(to_string(&Event::Count(3)).unwrap(), "renamed: 3\n");
     roundtrip(&Event::Count(3));
     roundtrip(&Event::Pair("x".into(), false));
     roundtrip(&Event::Record {
@@ -137,10 +137,10 @@ fn invalid_enum_shapes_and_unknown_variants_fail() {
     for text in [
         "values:\n  - Unknown",
         "values:\n  - renamed",
-        "values:\n  - Idle = null",
-        "values:\n  - renamed = true",
+        "values:\n  - Idle: null",
+        "values:\n  - renamed: true",
         "values:\n  - Pair:\n      - one",
-        "values:\n  -\n    renamed = 1\n    extra = 2",
+        "values:\n  -\n    renamed: 1\n    extra: 2",
         "values:\n  - {}",
     ] {
         assert!(from_str::<Events>(text).is_err(), "{text}");
@@ -161,8 +161,8 @@ fn root_objects_are_required_for_both_directions() {
         assert_eq!(error.kind, ErrorKind::InvalidValue);
         assert!(error.message.contains("root"));
     }
-    assert!(from_str::<i64>("n = 1").is_err());
-    assert!(from_str::<Vec<i64>>("n = 1").is_err());
+    assert!(from_str::<i64>("n: 1").is_err());
+    assert!(from_str::<Vec<i64>>("n: 1").is_err());
     assert!(from_str::<String>("").is_err());
     assert!(from_str::<()>("").is_err());
     roundtrip(&Some(BTreeMap::from([("n".to_owned(), 1i64)])));
@@ -183,28 +183,27 @@ struct Defaults {
 
 #[test]
 fn missing_defaults_null_unknown_and_renamed_fields_follow_serde() {
-    let value = from_str::<Defaults>("required = 1\nunknown:\n  - nested = true").unwrap();
+    let value = from_str::<Defaults>("required: 1\nunknown:\n  - nested: true").unwrap();
     assert_eq!(value.optional, None);
     assert!(value.values.is_empty());
     assert_eq!(value.name, "");
-    let null = from_str::<Defaults>("required = 1\noptional = null").unwrap();
+    let null = from_str::<Defaults>("required: 1\noptional: null").unwrap();
     assert_eq!(value, null);
-    let renamed =
-        from_str::<Defaults>("required = 2\ndisplay-name = Oleh\noptional = Kyiv").unwrap();
+    let renamed = from_str::<Defaults>("required: 2\ndisplay-name: Oleh\noptional: Kyiv").unwrap();
     roundtrip(&renamed);
     assert!(
-        from_str::<Defaults>("optional = null")
+        from_str::<Defaults>("optional: null")
             .unwrap_err()
             .message
             .contains("missing field")
     );
-    assert!(from_str::<Defaults>("required = null").is_err());
-    assert!(from_str::<Defaults>("required = 1\nvalues = null").is_err());
+    assert!(from_str::<Defaults>("required: null").is_err());
+    assert!(from_str::<Defaults>("required: 1\nvalues: null").is_err());
     #[derive(Debug, Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Strict {}
     assert!(
-        from_str::<Strict>("unexpected = 1")
+        from_str::<Strict>("unexpected: 1")
             .unwrap_err()
             .message
             .contains("unknown field")
@@ -246,8 +245,8 @@ fn string_escaping_and_reserved_literals_use_the_core_serializer() {
         "19.99",
         "9223372036854775808",
         "00123",
-        "name = value",
-        "a=b=c",
+        "name: value",
+        "a: b=c",
         "# literal",
         "1e10",
         "Олег 🚀",
@@ -307,24 +306,24 @@ fn serialization_rejects_integer_overflow_and_nonfinite_floats() {
 #[test]
 fn checked_deserialization_rejects_overflow_and_incompatible_types() {
     for result in [
-        from_str::<BTreeMap<String, u8>>("n = 256").map(|_| ()),
-        from_str::<BTreeMap<String, u8>>("n = -1").map(|_| ()),
-        from_str::<BTreeMap<String, i8>>("n = 128").map(|_| ()),
-        from_str::<BTreeMap<String, i8>>("n = -129").map(|_| ()),
-        from_str::<BTreeMap<String, i16>>("n = 32768").map(|_| ()),
-        from_str::<BTreeMap<String, i32>>("n = 2147483648").map(|_| ()),
-        from_str::<BTreeMap<String, u32>>("n = 4294967296").map(|_| ()),
+        from_str::<BTreeMap<String, u8>>("n: 256").map(|_| ()),
+        from_str::<BTreeMap<String, u8>>("n: -1").map(|_| ()),
+        from_str::<BTreeMap<String, i8>>("n: 128").map(|_| ()),
+        from_str::<BTreeMap<String, i8>>("n: -129").map(|_| ()),
+        from_str::<BTreeMap<String, i16>>("n: 32768").map(|_| ()),
+        from_str::<BTreeMap<String, i32>>("n: 2147483648").map(|_| ()),
+        from_str::<BTreeMap<String, u32>>("n: 4294967296").map(|_| ()),
     ] {
         assert_eq!(result.unwrap_err().kind, ErrorKind::InvalidNumber);
     }
     for result in [
-        from_str::<BTreeMap<String, i64>>("n = 1.0").map(|_| ()),
-        from_str::<BTreeMap<String, i64>>("n = \"1\"").map(|_| ()),
-        from_str::<BTreeMap<String, String>>("n = 1").map(|_| ()),
-        from_str::<BTreeMap<String, bool>>("n = 1").map(|_| ()),
-        from_str::<BTreeMap<String, Vec<i64>>>("n = null").map(|_| ()),
-        from_str::<BTreeMap<String, char>>("n = two").map(|_| ()),
-        from_str::<BTreeMap<String, char>>("n = \"\"").map(|_| ()),
+        from_str::<BTreeMap<String, i64>>("n: 1.0").map(|_| ()),
+        from_str::<BTreeMap<String, i64>>("n: \"1\"").map(|_| ()),
+        from_str::<BTreeMap<String, String>>("n: 1").map(|_| ()),
+        from_str::<BTreeMap<String, bool>>("n: 1").map(|_| ()),
+        from_str::<BTreeMap<String, Vec<i64>>>("n: null").map(|_| ()),
+        from_str::<BTreeMap<String, char>>("n: two").map(|_| ()),
+        from_str::<BTreeMap<String, char>>("n: \"\"").map(|_| ()),
     ] {
         assert_eq!(result.unwrap_err().kind, ErrorKind::InvalidValue);
     }
@@ -362,9 +361,9 @@ fn floats_roundtrip_exact_bits_including_negative_zero() {
 #[test]
 fn inexact_integer_to_float_and_float_narrowing_are_errors() {
     for text in [
-        "n = 9007199254740993",
-        "n = 9223372036854775807",
-        "n = -9007199254740993",
+        "n: 9007199254740993",
+        "n: 9223372036854775807",
+        "n: -9007199254740993",
     ] {
         assert_eq!(
             from_str::<BTreeMap<String, f64>>(text).unwrap_err().kind,
@@ -372,10 +371,10 @@ fn inexact_integer_to_float_and_float_narrowing_are_errors() {
         );
     }
     for text in [
-        "n = 16777217",
-        "n = 0.1",
-        "n = 0.00000000000000000000000000000000000000000000000001",
-        "n = 340282366920938463463374607431768211456.0",
+        "n: 16777217",
+        "n: 0.1",
+        "n: 0.00000000000000000000000000000000000000000000000001",
+        "n: 340282366920938463463374607431768211456.0",
     ] {
         assert_eq!(
             from_str::<BTreeMap<String, f32>>(text).unwrap_err().kind,
@@ -383,15 +382,15 @@ fn inexact_integer_to_float_and_float_narrowing_are_errors() {
         );
     }
     assert_eq!(
-        from_str::<BTreeMap<String, f64>>("n = 42").unwrap()["n"],
+        from_str::<BTreeMap<String, f64>>("n: 42").unwrap()["n"],
         42.0
     );
     assert_eq!(
-        from_str::<BTreeMap<String, f32>>("n = 0.5").unwrap()["n"],
+        from_str::<BTreeMap<String, f32>>("n: 0.5").unwrap()["n"],
         0.5
     );
     assert_eq!(
-        from_str::<BTreeMap<String, f64>>("n = -9223372036854775808").unwrap()["n"],
+        from_str::<BTreeMap<String, f64>>("n: -9223372036854775808").unwrap()["n"],
         i64::MIN as f64
     );
 }
@@ -402,13 +401,13 @@ fn invalid_map_and_renamed_keys_are_errors() {
         to_string(&BTreeMap::from([(1, true)])).unwrap_err().kind,
         ErrorKind::InvalidKey
     );
-    for key in ["", "1key", "bad key", "a=b", "🚀"] {
+    for key in ["", "1key", "bad key", "a: b", "🚀"] {
         assert_eq!(
             to_string(&BTreeMap::from([(key, true)])).unwrap_err().kind,
             ErrorKind::InvalidKey
         );
     }
-    assert!(from_str::<BTreeMap<i32, bool>>("one = true").is_err());
+    assert!(from_str::<BTreeMap<i32, bool>>("one: true").is_err());
     #[derive(Serialize)]
     struct BadField {
         #[serde(rename = "bad key")]
@@ -431,9 +430,9 @@ fn invalid_map_and_renamed_keys_are_errors() {
 
 #[test]
 fn parser_errors_keep_spans_and_conversion_errors_have_context() {
-    let error = from_str::<Profile>("age = 9223372036854775808").unwrap_err();
+    let error = from_str::<Profile>("age: 9223372036854775808").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidNumber);
-    assert_eq!(error.span.unwrap().column, 7);
+    assert_eq!(error.span.unwrap().column, 6);
     let error = from_str::<BTreeMap<String, Vec<u8>>>("values:\n  - 1\n  - 256").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidNumber);
     assert!(error.message.contains("field 'values'"));
@@ -460,7 +459,7 @@ fn custom_errors_propagate_as_axs_errors() {
     assert!(error.message.contains("custom serialization failure"));
     let error = <AxsError as de::Error>::custom("custom deserialization failure");
     assert_eq!(error.kind, ErrorKind::InvalidValue);
-    let error = from_str::<BTreeMap<String, CustomError>>("field = value").unwrap_err();
+    let error = from_str::<BTreeMap<String, CustomError>>("field: value").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidValue);
     assert!(
         error
@@ -589,14 +588,13 @@ fn byte_token_and_conversion_budgets_are_enforced() {
             .kind,
         ErrorKind::SyntaxError
     );
-    assert_eq!(
+    // Inline arrays count one token per element, so half the budget fits.
+    assert!(
         to_string(&BTreeMap::from([(
             "value".to_owned(),
             NullSequence(MAX_TOKENS / 2)
         )]))
-        .unwrap_err()
-        .kind,
-        ErrorKind::SyntaxError
+        .is_ok()
     );
     assert_eq!(
         to_string(&BTreeMap::from([(
@@ -617,7 +615,7 @@ fn byte_token_and_conversion_budgets_are_enforced() {
 
 #[test]
 fn tuple_lengths_are_checked() {
-    for source in ["v = []", "v:\n  - 1", "v:\n  - 1\n  - true\n  - extra"] {
+    for source in ["v: []", "v:\n  - 1", "v:\n  - 1\n  - true\n  - extra"] {
         assert!(from_str::<BTreeMap<String, (i32, bool)>>(source).is_err());
     }
     roundtrip(&BTreeMap::from([("v".to_owned(), (1i32, true))]));
@@ -654,7 +652,7 @@ fn property_numeric_and_string_roundtrips_are_reproducible() {
         roundtrip(&BTreeMap::from([(
             "strings".to_owned(),
             vec![
-                format!("name = {seed}"),
+                format!("name: {seed}"),
                 format!("{seed}"),
                 format!("🚀\n{seed}\0"),
             ],
@@ -712,7 +710,7 @@ fn buffered_numeric_enums_cannot_bypass_checked_conversion() {
     enum Buffered {
         Float(f32),
     }
-    let result = from_str::<BTreeMap<String, Buffered>>("n = 0.1");
+    let result = from_str::<BTreeMap<String, Buffered>>("n: 0.1");
     assert!(result.is_err());
     // Exercise the derived payload so Clippy verifies the type without dead fields.
     let Buffered::Float(number) = Buffered::Float(0.5);
@@ -722,7 +720,7 @@ fn buffered_numeric_enums_cannot_bypass_checked_conversion() {
     enum Tagged {
         Data { value: f32 },
     }
-    assert!(from_str::<Tagged>("kind = Data\nvalue = 0.1").is_err());
+    assert!(from_str::<Tagged>("kind: Data\nvalue: 0.1").is_err());
     let Tagged::Data { value } = Tagged::Data { value: 0.5 };
     assert_eq!(value, 0.5);
 }
@@ -754,7 +752,7 @@ fn deserialization_wrapper_recursion_is_bounded() {
         ErrorKind::SyntaxError
     );
     assert_eq!(
-        from_str::<BTreeMap<DeserializeLoop, String>>("key = value")
+        from_str::<BTreeMap<DeserializeLoop, String>>("key: value")
             .unwrap_err()
             .kind,
         ErrorKind::SyntaxError
@@ -787,7 +785,7 @@ impl Serialize for DisplayValue {
 fn collect_str_respects_the_intermediate_byte_budget() {
     assert_eq!(
         to_string(&BTreeMap::from([("display", DisplayValue(3))])).unwrap(),
-        "display = texttexttext\n"
+        "display: texttexttext\n"
     );
     assert_eq!(
         to_string(&BTreeMap::from([(
@@ -803,12 +801,12 @@ fn collect_str_respects_the_intermediate_byte_budget() {
 #[test]
 fn malformed_inputs_return_errors_through_the_public_serde_api() {
     for source in [
-        "x = \"",
-        "x = \"\\q\"",
-        "x = 9223372036854775808",
-        "  x = 1",
-        "x:\n   y = 1",
-        "name = a\nname = b",
+        "x: \"",
+        "x: \"\\q\"",
+        "x: 9223372036854775808",
+        "  x: 1",
+        "x:\n   y: 1",
+        "name: a\nname: b",
     ] {
         let error = from_str::<BTreeMap<String, String>>(source).unwrap_err();
         assert!(error.span.is_some());

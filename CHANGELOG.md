@@ -5,9 +5,26 @@
 No published release history was verified. The manifest is still 0.1.0; earlier
 development milestone labels are not asserted to be crates.io releases.
 
-### Breaking grammar change
+### Breaking grammar change: Grammar v3
 
-- Grammar v2 requires `key:` for all named nonempty object/array blocks. The
+- Grammar v3 replaces v2 without a migration mode (spec/AXS.md; v2 kept as
+  spec/AXS-v2.md). Fields are `key: value`; `key = value` is rejected.
+- New: inline arrays `[a, b]`, `|` text blocks, tables `key{a, b}:` with
+  `- x, y` rows, optional checked lengths `key[N]`, quoted keys, `.` in bare
+  keys, and exponent floats.
+- Key order is preserved: `AxsObject` (`IndexMap`) replaces `HashMap`, and the
+  serializer no longer sorts. `axs fmt --sort-keys` and `value::sort_keys`
+  sort explicitly. JSON conversion keeps key order.
+- The serializer picks tables, inline arrays, or blocks, writes lengths, and
+  uses text blocks for multiline strings. Non-bare keys are quoted instead of
+  rejected.
+- `TokenKind` drops `Equals` and adds `Length`, `Columns`, `Items`, `Text`.
+  `ErrorKind` adds `LengthMismatch` (AXS010) and `InvalidCollection` (AXS011).
+- Normative conformance fixtures in `tests/conformance/`.
+
+### Breaking grammar change: Grammar v2
+
+- Grammar v2 required `key:` for all named nonempty object/array blocks. The
   parser rejects legacy bare keys and mixed old/new block syntax; no legacy
   grammar mode is provided. `key = value`, empty `[]`/`{}` assignments, primitive
   typing, escaping, and resource limits are preserved.

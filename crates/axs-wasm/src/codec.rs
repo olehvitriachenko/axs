@@ -19,10 +19,8 @@
 //! `u32` line, column, and length; a help flag byte and, when set, a help string.
 //! Strings in the error body use the `u32` length prefix.
 
-use std::collections::HashMap;
-
 use axs::lexer::MAX_NESTING_DEPTH;
-use axs::{AxsError, AxsValue, ErrorKind};
+use axs::{AxsError, AxsObject, AxsValue, ErrorKind};
 
 const TAG_NULL: u8 = 0;
 const TAG_FALSE: u8 = 1;
@@ -40,8 +38,6 @@ pub(crate) const STATUS_ERROR: u8 = 1;
 /// deepest block the serializer accepts. Anything deeper is rejected while
 /// decoding so recursion stays bounded even for malformed payloads.
 const MAX_PAYLOAD_DEPTH: usize = MAX_NESTING_DEPTH + 1;
-
-type AxsObject = HashMap<String, AxsValue>;
 
 pub fn encode_ok_object(object: &AxsObject) -> Vec<u8> {
     let mut output = vec![STATUS_OK];
@@ -107,6 +103,8 @@ pub fn kind_name(kind: ErrorKind) -> &'static str {
         ErrorKind::InvalidString => "InvalidString",
         ErrorKind::InvalidNumber => "InvalidNumber",
         ErrorKind::SyntaxError => "SyntaxError",
+        ErrorKind::LengthMismatch => "LengthMismatch",
+        ErrorKind::InvalidCollection => "InvalidCollection",
     }
 }
 
@@ -127,10 +125,8 @@ fn write_str(text: &str, output: &mut Vec<u8>) {
 fn write_object(object: &AxsObject, output: &mut Vec<u8>) {
     output.push(TAG_OBJECT);
     write_u32(saturate(object.len()), output);
-    // HashMap order is unspecified; sort so JavaScript sees deterministic keys.
-    let mut entries: Vec<_> = object.iter().collect();
-    entries.sort_by_key(|(key, _)| *key);
-    for (key, value) in entries {
+    // Entries keep document order, matching JavaScript object key order.
+    for (key, value) in object {
         write_str(key, output);
         write_value(value, output);
     }
@@ -230,7 +226,7 @@ impl Reader<'_> {
             return Err(depth_error());
         }
         let count = self.count()?;
-        let mut object = HashMap::with_capacity(count);
+        let mut object = AxsObject::with_capacity(count);
         for _ in 0..count {
             let key = self.string()?;
             let value = self.value(depth + 1)?;
@@ -287,9 +283,9 @@ mod tests {
 
     #[test]
     fn values_survive_the_payload_exactly() {
-        let source = "a = 9223372036854775807\nb = -9223372036854775808\nc = -0.0\n\
-                      d = 0.1\ne = \"x\\ny\"\nf = null\ng = true\nh = []\ni = {}\n\
-                      j:\n  - 1\n  -\n    k = Олег 🚀\n";
+        let source = "a: 9223372036854775807\nb: -9223372036854775808\nc: -0.0\n\
+                      d: 0.1\ne: \"x\\ny\"\nf: null\ng: true\nh: []\ni: {}\n\
+                      j:\n  - 1\n  -\n    k: Олег 🚀\n";
         let object = axs::parse(source).unwrap();
         let restored = round_trip(&object);
         assert_eq!(restored, object);
@@ -300,18 +296,18 @@ mod tests {
     }
 
     #[test]
-    fn object_keys_are_sorted_deterministically() {
-        let object = axs::parse("z = 1\na = 2\nm = 3").unwrap();
+    fn object_keys_keep_document_order() {
+        let object = axs::parse("z: 1\na: 2\nm: 3").unwrap();
         let encoded = encode_ok_object(&object);
-        let first = encoded.windows(1).position(|w| w == b"a").unwrap();
-        let second = encoded.windows(1).position(|w| w == b"m").unwrap();
-        let third = encoded.windows(1).position(|w| w == b"z").unwrap();
+        let first = encoded.windows(1).position(|w| w == b"z").unwrap();
+        let second = encoded.windows(1).position(|w| w == b"a").unwrap();
+        let third = encoded.windows(1).position(|w| w == b"m").unwrap();
         assert!(first < second && second < third);
     }
 
     #[test]
     fn malformed_payloads_are_errors_not_panics() {
-        let valid = encode_ok_object(&axs::parse("a:\n  - x\nb = 1").unwrap());
+        let valid = encode_ok_object(&axs::parse("a:\n  - x\nb: 1").unwrap());
         let body = &valid[1..];
         // Every truncation and every single-byte corruption must be handled.
         for end in 0..body.len() {
@@ -352,7 +348,7 @@ mod tests {
 
     #[test]
     fn errors_carry_code_kind_span_and_help() {
-        let error = axs::parse("a = 1\na = 2").unwrap_err();
+        let error = axs::parse("a: 1\na: 2").unwrap_err();
         let encoded = encode_error(&error);
         assert_eq!(encoded[0], STATUS_ERROR);
         let mut reader = Reader {
@@ -371,21 +367,21 @@ mod tests {
 
     #[test]
     fn exported_functions_wrap_core_results() {
-        let parsed = crate::parse("name = AXS");
+        let parsed = crate::parse("name: AXS");
         assert_eq!(parsed[0], STATUS_OK);
         let text = crate::stringify(&parsed[1..]);
         assert_eq!(text[0], STATUS_OK);
-        assert_eq!(&text[1..], b"name = AXS\n");
+        assert_eq!(&text[1..], b"name: AXS\n");
 
         assert_eq!(crate::check("a:\n  - x\n"), vec![STATUS_OK]);
-        assert_eq!(crate::check("a = 1\na = 2")[0], STATUS_ERROR);
+        assert_eq!(crate::check("a: 1\na: 2")[0], STATUS_ERROR);
 
-        // Matches `axs fmt`: floats keep their type, keys are sorted.
-        let formatted = crate::format("b = 1.0\na = 100000000000000000000.0\nc = 2.50\n");
+        // Matches `axs fmt`: floats keep their type, keys keep their order.
+        let formatted = crate::format("b: 1.0\na: 100000000000000000000.0\nc: 2.50\n");
         assert_eq!(formatted[0], STATUS_OK);
         assert_eq!(
             std::str::from_utf8(&formatted[1..]).unwrap(),
-            "a = 100000000000000000000.0\nb = 1.0\nc = 2.5\n"
+            "b: 1.0\na: 100000000000000000000.0\nc: 2.5\n"
         );
         assert_eq!(crate::format("bad")[0], STATUS_ERROR);
 

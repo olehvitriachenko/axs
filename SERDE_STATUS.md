@@ -55,16 +55,17 @@ and unit variants are accepted; numeric keys are rejected, not stringified.
 Renamed struct fields and data-variant tags must also satisfy the key grammar.
 Unit-variant names are string values and are not restricted to key syntax.
 Duplicate keys from custom serialization/flattening fail rather than overwrite.
-Structs and map entries serialize in sorted key order; map deserialization also
-sorts entries so error order is deterministic.
+Struct fields serialize in declaration order and map entries in the map's
+iteration order (sorted for `BTreeMap`, unspecified for `HashMap`, as with
+serde_json). Deserialization visits fields in document order.
 
-For example, a nested `State::Ready` field uses `state = Ready`; a nested
+For example, a nested `State::Ready` field uses `state: Ready`; a nested
 `State::Progress { percent: 75 }` uses:
 
 ```text
 state:
   Progress:
-    percent = 75
+    percent: 75
 ```
 
 A unit variant must deserialize from its string representation. A payload

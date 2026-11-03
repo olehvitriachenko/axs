@@ -14,12 +14,12 @@ fn assert_compatible(source: &str) {
 
 #[test]
 fn parses_primitives() {
-    assert_compatible("name = Oleh\nage = 22\nactive = true\n");
+    assert_compatible("name: Oleh\nage: 22\nactive: true\n");
 }
 
 #[test]
 fn parses_nested_object() {
-    assert_compatible("user:\n  name = Oleh\n  age = 22\n");
+    assert_compatible("user:\n  name: Oleh\n  age: 22\n");
 }
 
 #[test]
@@ -31,10 +31,10 @@ fn parses_array() {
 fn parses_inline_objects() {
     assert_compatible(
         r#"users:
-  - name = Oleh
-    age = 22
-  - name = Alex
-    age = 25
+  - name: Oleh
+    age: 22
+  - name: Alex
+    age: 25
 "#,
     );
 }
@@ -43,11 +43,11 @@ fn parses_inline_objects() {
 fn parses_deeply_nested_structures() {
     assert_compatible(
         r#"users:
-  - name = Oleh
+  - name: Oleh
     skills:
       - Rust
       - TypeScript
-  - name = Alex
+  - name: Alex
     skills:
       - Go
 "#,
@@ -70,32 +70,32 @@ fn parses_nested_arrays() {
 
 #[test]
 fn parses_empty_collections() {
-    assert_compatible("tags = []\nsettings = {}\n");
+    assert_compatible("tags: []\nsettings: {}\n");
 }
 
 #[test]
 fn parses_quoted_strings() {
-    assert_compatible("name = \"123\"\nempty = \"\"\n");
+    assert_compatible("name: \"123\"\nempty: \"\"\n");
 }
 
 #[test]
 fn rejects_duplicate_keys() {
-    assert!(parse_tokens("name = Oleh\nname = Alex").is_err());
+    assert!(parse_tokens("name: Oleh\nname: Alex").is_err());
 }
 
 #[test]
 fn rejects_invalid_indentation() {
-    assert!(parse_tokens("user:\n    name = Oleh").is_err());
+    assert!(parse_tokens("user:\n    name: Oleh").is_err());
 }
 
 #[test]
 fn rejects_missing_value() {
-    assert!(parse_tokens("name = ").is_err());
+    assert!(parse_tokens("name: ").is_err());
 }
 
 #[test]
 fn parses_array_objects() {
-    let data = parse_tokens("users:\n  - name = Oleh\n    age = 22\n").unwrap();
+    let data = parse_tokens("users:\n  - name: Oleh\n    age: 22\n").unwrap();
 
     let AxsValue::Array(users) = &data["users"] else {
         panic!("Expected array");

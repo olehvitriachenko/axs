@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::value::AxsObject;
 
 use serde::de::{self, DeserializeSeed, Visitor};
 
@@ -305,9 +305,9 @@ struct Object {
     recursion: usize,
 }
 impl Object {
-    fn new(values: HashMap<String, AxsValue>, recursion: usize) -> Self {
-        let mut values: Vec<_> = values.into_iter().collect();
-        values.sort_by(|a, b| a.0.cmp(&b.0));
+    fn new(values: AxsObject, recursion: usize) -> Self {
+        // Fields are visited in document order.
+        let values: Vec<_> = values.into_iter().collect();
         Self {
             values: values.into_iter(),
             pending: None,

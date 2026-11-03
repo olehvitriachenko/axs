@@ -19,7 +19,7 @@ fn error_codes_are_stable() {
 
 #[test]
 fn renders_source_location() {
-    let source = "name = Oleh\nage = \nactive = true";
+    let source = "name: Oleh\nage: \nactive: true";
 
     let error = AxsError::new(ErrorKind::InvalidValue, "Expected value")
         .with_span(SourceSpan::new(2, 7, 1));
@@ -27,7 +27,7 @@ fn renders_source_location() {
     let output = error.render(source, "profile.axs");
 
     assert!(output.contains("profile.axs:2:7"));
-    assert!(output.contains("2 | age = "));
+    assert!(output.contains("2 | age: "));
     assert!(output.contains("^"));
 }
 
@@ -37,7 +37,7 @@ fn renders_help_message() {
         .with_span(SourceSpan::new(2, 4, 1))
         .with_help("Use exactly two spaces per level");
 
-    let output = error.render("user:\n   name = Oleh", "test.axs");
+    let output = error.render("user:\n   name: Oleh", "test.axs");
 
     assert!(output.contains("AXS002"));
     assert!(output.contains("help: Use exactly two spaces per level"));

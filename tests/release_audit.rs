@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[test]
 fn long_line_diagnostics_have_bounded_output() {
-    let source = format!("name = {}🚀", "x".repeat(100_000));
+    let source = format!("name: {}🚀", "x".repeat(100_000));
     let error = AxsError::new(ErrorKind::InvalidString, "bad value")
         .with_span(SourceSpan::new(1, 100_008, 100_000));
     let rendered = error.render(&source, "input.axs");
@@ -15,22 +15,23 @@ fn long_line_diagnostics_have_bounded_output() {
 }
 
 #[test]
-fn serialization_is_deterministic_across_map_insertion_order() {
-    let mut first = std::collections::HashMap::new();
-    let mut second = std::collections::HashMap::new();
-    for key in ["z", "a", "m"] {
-        first.insert(key, key);
-    }
-    for key in ["m", "a", "z"] {
-        second.insert(key, key);
+fn serialization_preserves_field_and_document_order() {
+    #[derive(Serialize)]
+    struct Fields {
+        z: u8,
+        a: u8,
+        m: u8,
     }
     assert_eq!(
-        axs::to_string(&first).unwrap(),
-        axs::to_string(&second).unwrap()
+        axs::to_string(&Fields { z: 1, a: 2, m: 3 }).unwrap(),
+        "z: 1\na: 2\nm: 3\n"
     );
+    // Sorted maps stay deterministic; order follows the map's iteration.
+    let sorted = BTreeMap::from([("z", 1), ("a", 2), ("m", 3)]);
+    assert_eq!(axs::to_string(&sorted).unwrap(), "a: 2\nm: 3\nz: 1\n");
     assert_eq!(
-        axs::stringify(&axs::parse("z = z\na = a\nm = m").unwrap()).unwrap(),
-        "a = a\nm = m\nz = z\n"
+        axs::stringify(&axs::parse("z: z\na: a\nm: m").unwrap()).unwrap(),
+        "z: z\na: a\nm: m\n"
     );
 }
 
@@ -56,7 +57,7 @@ fn numeric_flatten_deserialization_fails_predictably() {
         #[serde(flatten)]
         other: BTreeMap<String, f32>,
     }
-    let source = "name = example\nvalue = 0.1";
+    let source = "name: example\nvalue: 0.1";
     let error = axs::from_str::<Flat>(source).unwrap_err();
     assert!(
         error
@@ -134,7 +135,7 @@ fn one_megabyte_stack_probe() {
                 for depth in 0..128 {
                     source.push_str(&format!("{}child:\n", "  ".repeat(depth)));
                 }
-                source.push_str(&format!("{}v = 1\n", "  ".repeat(128)));
+                source.push_str(&format!("{}v: 1\n", "  ".repeat(128)));
                 let tree = axs::parse(&source).unwrap();
                 axs::stringify(&tree).unwrap();
                 assert!(axs::to_string(&BTreeMap::from([("v", AuditWrapper(10_000))])).is_err());
@@ -182,7 +183,7 @@ fn structured_mutation_property_tests_are_reproducible() {
         seed ^= seed << 17;
         let values = BTreeMap::from([(
             "values",
-            vec![format!("key = {seed}"), format!("🚀\n{case}")],
+            vec![format!("key: {seed}"), format!("🚀\n{case}")],
         )]);
         let encoded = axs::to_string(&values).unwrap();
         let mut chars: Vec<_> = encoded.chars().collect();
@@ -209,9 +210,9 @@ fn structured_mutation_property_tests_are_reproducible() {
 
 #[test]
 fn syntax_specification_examples_parse_with_the_real_api() {
-    let spec = include_str!("../spec/AXS-v2.md").replace("\r\n", "\n");
+    let spec = include_str!("../spec/AXS.md").replace("\r\n", "\n");
     let mut count = 0;
-    for block in spec.split("```text\n").skip(1) {
+    for block in spec.split("```axs\n").skip(1) {
         let (source, _) = block.split_once("```").unwrap();
         let values = axs::parse(source).unwrap_or_else(|error| panic!("{source}\n{error}"));
         assert_eq!(

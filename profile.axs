@@ -1,28 +1,22 @@
+name: Oleh
+age: 22
 
-name = Oleh
-age = 22
+users{name, age}:
+  - Oleh, 22
+  - Alex, 25
 
-users:
-  - name = Oleh
-    age = 22
-    skills:
-      - Rust
-      - TypeScript
+projects:
+  - title: AXS
+    tags: [rust, typescript, llm]
+    description: |
+      A compact data format for language models.
+      Fewer tokens than JSON, same data model.
 
-  - name = Alex
-    age = 25
-    skills:
-      - Go
-      - PostgreSQL
+  - title: Notes
+    tags: []
 
-settings = {}
-tags = []
+settings: {}
 
 matrix:
-  -
-    - 1
-    - 2
-  -
-    - 3
-    - 4
-  
+  - [1, 2]
+  - [3, 4]
