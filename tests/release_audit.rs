@@ -209,7 +209,7 @@ fn structured_mutation_property_tests_are_reproducible() {
 
 #[test]
 fn syntax_specification_examples_parse_with_the_real_api() {
-    let spec = include_str!("../spec/AXS.md").replace("\r\n", "\n");
+    let spec = include_str!("../spec/AXS-v2.md").replace("\r\n", "\n");
     let mut count = 0;
     for block in spec.split("```text\n").skip(1) {
         let (source, _) = block.split_once("```").unwrap();

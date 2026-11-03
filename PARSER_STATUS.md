@@ -107,7 +107,7 @@ helpers process individual values and do not apply document budgets.
 `Result<String, String>`. `parser::parse` and `parse_legacy` retain their string
 error signatures and delegate to the token parser. These compatibility entry
 points also reject old bare block syntax: signature compatibility does not mean
-syntax compatibility. See the migration examples in `spec/AXS.md` and README.
+syntax compatibility. See the migration examples in `spec/AXS-v2.md` and README.
 Error wording includes stable AXS codes;
 previous inconsistencies (quoted `=` in arrays, duplicate inline fields, and
 missing safety limits) are not retained.

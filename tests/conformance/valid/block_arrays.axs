@@ -1,0 +1,10 @@
+skills:
+  - Rust
+  - TypeScript
+matrix:
+  -
+    - 1
+    - 2
+  - [3, 4]
+  - []
+  - {}

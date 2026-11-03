@@ -41,7 +41,7 @@ user:
 
 Bare named keys and documents mixing bare and colon block headers are rejected,
 including through `parse_legacy` (which preserves its signature only). See
-[the specification](spec/AXS.md) for the formal grammar and migration examples.
+[the specification](spec/AXS-v2.md) for the formal grammar and migration examples.
 Public `TokenKind` adds `Colon`; exhaustive matches must handle it. Rust API
 signatures, primitive typing, string escaping, and resource limits are retained.
 

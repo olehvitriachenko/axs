@@ -1,0 +1,5 @@
+items:
+  - http://host
+  - 10:30
+  - "note: x"
+  - "UI:"

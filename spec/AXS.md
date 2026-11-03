@@ -1,93 +1,129 @@
-# AXS — Data Serialization Format
+# AXS — Data Format for Language Models
 
-**Grammar Version:** 2 (pre-1.0 draft)
-**Status:** Experimental  
+**Grammar Version:** 3 (pre-1.0 draft)
+**Status:** Experimental, not yet implemented (the Rust crate implements [Grammar v2](AXS-v2.md))
 **Reference Implementation:** Rust
 
 ## 1. Overview
 
-AXS is a human-readable, indentation-based data serialization format designed to minimize typing while preserving predictable data types.
+AXS is a compact, human-readable, indentation-based data format with the JSON
+data model. It is designed primarily for data that language models read and
+write: tool results, structured output, and context. It aims to spend fewer
+tokens than JSON on the same data while staying unambiguous and strict.
 
 ### Design principles
 
-- Minimal syntax and boilerplate.
-- Human-readable, human-writable.
-- No mandatory quotation marks for ordinary strings.
-- No commas or braces required for non-empty nested structures.
-- Deterministic parsing.
-- Safe serialization without executing code.
-- Language-independent data model.
+- Same data model as JSON, plus a distinct integer type.
+- Fewer tokens than JSON: no mandatory quotes, braces, or commas for nested
+  structures, and tables for arrays of uniform objects.
+- Familiar to models: `key: value`, indentation, `[a, b]` lists, `|` text blocks.
+- Strict and deterministic: one document has exactly one meaning, and every
+  invalid document is an error. Recovery from model mistakes is a separate,
+  explicit repair mode, never part of the core parser.
+- Self-checking: optional array lengths detect truncated output.
+- Safe: a parser never executes code.
 
-## 2. Encoding
+### Changes from Grammar v2
 
-AXS documents use UTF-8.
+Grammar v3 replaces Grammar v2 without a migration path.
 
-A document consists of key-value entries and nested collections.
+| v2 | v3 |
+|---|---|
+| `name = Oleh` | `name: Oleh` |
+| `tags = []`, `config = {}` | `tags: []`, `config: {}` |
+| Arrays of scalars only as `-` blocks | Also inline: `tags: [a, b]` |
+| No multiline strings | `body: \|` text blocks |
+| Arrays of objects repeat every key | Tables: `users{name, age}:` |
+| — | Optional lengths: `users[2]:` |
+| Unquoted keys only | Quoted keys: `"@type": Person` |
+| No exponent notation | `1.5e-7` is a float |
+| Serializer sorts keys | Key order is preserved |
 
-The root of an AXS document is an object.
+## 2. Encoding and documents
 
-Example:
+An AXS document is UTF-8 text. Lines end with LF or CRLF. Tabs are prohibited
+except inside quoted strings (as `\t`) and inside text block content (§8).
 
-```text
-name = Oleh
-age = 22
-active = true
+The root of a document is an object. An empty document is an empty object.
+Producers that need to encode a non-object value (for example a JSON array
+returned by a tool) wrap it in an object, conventionally under the key `result`.
+
+```axs
+name: Oleh
+age: 22
+active: true
 
 address:
-  city = Kyiv
-  country = Ukraine
+  city: Kyiv
+  country: Ukraine
 ```
 
-## 3. Data Types
+## 3. Data model
 
 | Type | Example | Description |
 |---|---|---|
-| String | `name = Oleh` | UTF-8 text |
-| Integer | `age = 22` | Signed 64-bit integer |
-| Float | `height = 1.76` | Finite floating-point number |
-| Boolean | `active = true` | True or false |
-| Null | `value = null` | Absence of value |
-| Array | `items = []` | Ordered collection |
-| Object | `config = {}` | String-keyed collection |
+| String | `name: Oleh` | UTF-8 text |
+| Integer | `age: 22` | Signed 64-bit integer |
+| Float | `height: 1.76` | Finite IEEE 754 binary64 |
+| Boolean | `active: true` | `true` or `false` |
+| Null | `value: null` | Absence of value |
+| Array | `tags: [a, b]` | Ordered sequence of values |
+| Object | `user:` + block | Ordered map with unique string keys |
 
-Arrays and objects may contain any supported AXS values.
+Object keys are unique and **ordered**: parsing preserves source order and
+serialization preserves the order of the value being serialized. Two objects
+with the same entries in a different order are equal as data, but serializers
+must not reorder them unless explicitly asked to (for example `fmt --sort-keys`).
 
-## 4. Key-Value Syntax
+## 4. Keys
 
-A scalar entry uses the following syntax:
+An unquoted key begins with an ASCII letter or `_` and continues with ASCII
+letters, digits, `_`, `-`, or `.`.
 
-```text
-key = value
+Any other key is written as a quoted string (§5):
+
+```axs
+"@type": Person
+"Content-Type": application/json
+"1": first
+"": empty key
 ```
 
-Spaces around `=` are optional:
-
-```text
-name=Oleh
-```
-
-or equivalently:
-
-```text
-name = Oleh
-```
-
-Keys must begin with an ASCII letter or underscore and may subsequently contain ASCII letters, digits, underscores, and hyphens.
-
-Duplicate keys within the same object are invalid.
+`Content-Type` needs no quotes; it is quoted above only to show that quoting is
+always allowed. The canonical form leaves a key
+unquoted whenever it can.
 
 ## 5. Strings
 
-AXS supports quoted and unquoted strings.
+### Unquoted strings
 
-```text
-name = Oleh
-message = Hello world!
-nameAsNumber = "123"
-enabledAsText = "true"
+A value that is not a reserved literal (§7), a number (§6), or one of the
+structural forms below is an unquoted string. Surrounding spaces are trimmed.
+
+```axs
+message: Hello, world!
+url: https://example.com/a?b=c#d
+time: 10:30
+title: Fix: crash on start
 ```
 
-Quoted strings support the following escape sequences:
+Everything after the first structural `: ` is the value, so later colons,
+`#`, and `=` are literal text.
+
+A string must be quoted when it:
+
+- is empty, or begins or ends with a space;
+- equals `true`, `false`, `null`, or matches number syntax (`"123"`, `"1.5"`);
+- begins with `"`, `[`, or `{`;
+- is exactly `|`;
+- contains a control character (including LF, CR, and tab), unless it is
+  written as a text block (§8);
+- appears in an inline array or table cell and contains `,`, or begins with `-`
+  followed by a space (see §9 and §10).
+
+### Quoted strings
+
+Quoted strings use `"` and support these escapes:
 
 | Escape | Meaning |
 |---|---|
@@ -97,287 +133,342 @@ Quoted strings support the following escape sequences:
 | `\r` | Carriage return |
 | `\t` | Tab |
 | `\0` | Null character |
-| `\u{1F680}` | Unicode scalar value |
+| `\u{1F680}` | Unicode scalar value (1–6 hex digits) |
 
-An empty string is written as `""`.
-
-Values matching reserved literals or numeric syntax must be quoted when a string is intended.
+Any other escape is an error. Nothing may follow the closing quote except
+spaces, or the `,` / `]` delimiters inside inline arrays and tables.
 
 ## 6. Numbers
 
-Integers use signed decimal notation without leading zeros, except for zero itself.
+Integers use signed decimal notation without leading zeros, except for zero
+itself, and must fit in a signed 64-bit integer. A `+` sign is not numeric.
 
-```text
-age = 22
-offset = -5
-zero = 0
+```axs
+age: 22
+offset: -5
+zero: 0
 ```
 
-A value such as `00123` is interpreted as a string.
+Floats contain a fractional part, an exponent, or both:
 
-Floating-point values contain a decimal point:
-
-```text
-height = 1.76
-temperature = -4.5
+```axs
+height: 1.76
+temperature: -4.5
+tiny: 1.5e-7
+huge: 6.02E23
+whole: 1e3
 ```
 
-The Rust implementation rejects integer overflow and non-finite floating-point
-results with `AXS008`. Decimal floats require digits on both sides of the point
-and no leading zeros in the whole part, except for zero itself. An optional
-minus sign is supported; a plus sign is not numeric syntax. Conversion to `f64`
-uses normal binary rounding, including underflow to signed zero.
+A fraction needs digits on both sides of `.`. An exponent is `e` or `E`, an
+optional sign, and one or more digits. Results must be finite; overflow is an
+error, underflow rounds to signed zero. `NaN`, `Infinity`, `00123`, `.5`, and
+`+1` are unquoted strings.
 
-Exponent notation, `NaN`, and `Infinity` are unquoted strings. The serializer
-emits decimal float notation and preserves negative floating-point zero.
+The canonical serializer writes the shortest decimal form that round-trips,
+using exponent notation only when it is shorter, and preserves `-0.0`. A float
+with an integral value keeps a fractional part (`1.0`), so it stays a float.
 
-## 7. Booleans and Null
+## 7. Booleans and null
 
-AXS recognizes only lowercase literals:
+Only lowercase `true`, `false`, and `null` are literals. Quote them to get
+strings. Other words such as `yes`, `no`, `on`, `off`, `True`, and `NULL` are
+ordinary unquoted strings.
 
-```text
-active = true
-disabled = false
-value = null
+## 8. Text blocks
+
+A value that is exactly `|` starts a text block. The block's content is every
+following line indented at least one level deeper than the line holding `|`,
+up to the first non-blank line that is not.
+
+```axs
+body: |
+  First line
+    indented line
+  # not a comment, just text
+
+  last line
+status: open
 ```
 
-These literals may be quoted to produce strings.
+`body` is `"First line\n  indented line\n# not a comment, just text\n\nlast line"`.
 
-## 8. Objects
+Rules:
 
-Nonempty named objects require a colon header and indentation:
+- Exactly the block's indentation is removed from each content line; deeper
+  indentation is kept.
+- Content lines may contain any character, including tabs, `#`, `:`, and `"`.
+  No escapes are processed.
+- Blank lines inside the block become empty lines. Blank lines at the end of the
+  block are not part of the content.
+- Lines are joined with LF. There is no final line break. CRLF in the source
+  is read as LF.
+- A block must contain at least one non-blank line.
 
-```text
-user:
-  name = Oleh
-  age = 22
-  address:
-    city = Kyiv
-```
-
-An empty object is represented by `{}`:
-
-```text
-settings = {}
-```
+Strings with leading or trailing line breaks, CR characters, or other control
+characters cannot be text blocks and use quoted form. The canonical serializer
+uses a text block for any other string containing LF.
 
 ## 9. Arrays
 
-Named arrays require a colon header and use hyphen-prefixed entries.
+### Inline arrays
 
-```text
+An array of primitive values may be written on one line:
+
+```axs
+tags: [rust, typescript, go]
+ids: [1, 2, 3]
+mixed: [1, two, 3.0, true, null, "a, b"]
+empty: []
+```
+
+Elements are separated by `,` and trimmed. Elements are primitives only (no
+nested arrays, objects, or text blocks). An unquoted element cannot contain `,`,
+`[`, or `]`. Trailing commas and empty elements are errors.
+
+### Block arrays
+
+Any array may be written as a block of `-` items one level deeper:
+
+```axs
 skills:
   - Rust
   - TypeScript
-  - PostgreSQL
-```
-
-An empty array is represented by `[]`:
-
-```text
-skills = []
-```
-
-Array elements may also be objects:
-
-```text
-users:
-  - name = Oleh
-    age = 22
-  - name = Alex
-    age = 25
-```
-
-Nested arrays and objects are supported:
-
-```text
 matrix:
   -
     - 1
     - 2
-  -
-    - 3
-    - 4
+  - [3, 4]
 ```
 
-An inline object's first field may itself introduce a named block:
+A bare `-` opens a nested block (an array or an object). `- [a, b]` is a
+nested inline array, and `- []` / `- {}` are empty collections.
 
-```text
+### Objects inside block arrays
+
+An item whose content starts with `key: ` (or `key:` at line end) is an object.
+Its first field sits on the dash line; further fields align two spaces deeper
+than the dash:
+
+```axs
+users:
+  - name: Oleh
+    age: 22
+    skills: [Rust, TypeScript]
+  - name: Alex
+    profile:
+      city: Lviv
+```
+
+When the first field opens a block (a nested object, block array, table, or
+text block), the block content is four spaces deeper than the dash, because the
+item opens two levels: the implicit object and its named child.
+
+```axs
 categories:
   - UI:
       - MUI
       - Tailwind
-    name = components
+    name: components
 ```
 
-The `UI` child content is four spaces deeper than the dash. Continuation fields
-such as `name` are two spaces deeper than the dash. This is equivalent to:
+After a dash, content is an object field only when its prefix is a valid key
+(or quoted key) followed by `:` and then a space or the line end. Otherwise it
+is a scalar: `- http://host` and `- 10:30` are strings. A string item that
+looks like a field (`- note: x`, `- UI:`) must be quoted.
 
-```text
-categories:
-  -
-    UI:
-      - MUI
-      - Tailwind
-    name = components
+### Lengths
+
+Any non-empty array may declare its length right after the key:
+
+```axs
+tags[3]: [rust, typescript, go]
+skills[2]:
+  - Rust
+  - TypeScript
 ```
 
-A `:` header must end after optional whitespace and must have a nonempty
-indented object or array. `key: value`, `key: []`, `key: {}`, `key::`, and bare
-named keys are invalid. Empty collections use assignments. Spaces before `:`
-are allowed; the canonical header has no space before `:`. Inline comments
-remain unsupported, including after a colon header.
+The length is a decimal integer without leading zeros. A length is optional;
+when present it must equal the number of elements, otherwise the document is
+invalid. Lengths let a reader detect truncated output. The canonical serializer
+always writes them. Empty arrays are written as `[]` without a length.
 
-After an array dash, a quoted value is always scalar. For an unquoted value,
-the first `=` or `:` is structural when its trimmed prefix is a valid key.
-Otherwise it remains string content, preserving `bad key = text` and `bad key:`.
-Array strings such as `UI:` and `http://host` must be quoted. Once `=` introduces
-an assigned value, later colons, equals signs, and dashes remain literal content.
+## 10. Tables
 
-## 10. Indentation
+An array of objects that all have the same keys and only primitive values may
+be written as a table. The header lists the field names in braces; each `-` row
+lists the values in the same order:
 
-- One nesting level equals exactly two ASCII spaces.
-- Tabs are prohibited.
-- Root-level entries have no indentation.
-- Unexpected indentation is an error. Increases are one level, except that
-  `- key:` requires two levels: the implicit object and its named child block.
-  Dedentation may return to the implicit object level for continuation fields.
-- Blank lines do not affect nesting.
-- The Rust implementation supports block depths 0 through 128 inclusive.
-  Inline array objects count as an extra level, as in their serialized block form.
-- Non-ASCII leading whitespace on content lines is invalid indentation.
-
-## 11. Comments
-
-A full-line comment begins with `#`.
-
-```text
-# Application settings
-debug = true
+```axs
+users[2]{id, name, email, active}:
+  - 1, Oleh, oleh@example.com, true
+  - 2, Alex, null, false
 ```
 
-Inline comments are not part of the current specification.
+is equivalent to:
 
-`#` inside an assignment or array value is literal text. Blank and full-line
-comment lines do not change indentation; raw tabs remain prohibited everywhere.
+```axs
+users[2]:
+  - id: 1
+    name: Oleh
+    email: oleh@example.com
+    active: true
+  - id: 2
+    name: Alex
+    email: null
+    active: false
+```
 
-## 12. Serialization
+Rules:
 
-A compliant serializer must preserve the semantic value and type of supported data.
+- Field names are keys (§4), separated by `,`, with no duplicates and at least
+  one field. The length (`[N]`) is optional and comes before the braces.
+- Every row has exactly as many cells as there are fields.
+- Cells follow the inline array element rules (§9): primitives only, quote
+  strings containing `,` and strings that need quotes anywhere.
+- A table has at least one row. Rows are one level deeper than the header, or,
+  for a header on a dash line (`- users{a, b}:`), two levels deeper than the dash.
+- Each row becomes an object with keys in header order.
 
-The core round-trip requirement is:
+The canonical serializer writes an array as a table when it has at least one
+element, every element is an object with the same keys in the same order, at
+least one key, and no value that is an array, an object, or a string that would
+need a text block. Otherwise it falls back to inline arrays (all primitives) or
+block arrays.
 
-`parse(stringify(value)) == value`
+## 11. Objects
 
-Serialization is not required to preserve whitespace, comments, or original key order.
+A key followed by `:` at line end opens a nested object or block array one level
+deeper. Which one is decided by the first content line: `- ` items make an
+array, fields make an object. Mixing them is an error.
 
-The reference serializer sorts object keys lexicographically, writes `:` for
-all named nonempty collections, expands inline array objects using a bare dash,
-and quotes strings that resemble structural array entries.
+```axs
+user:
+  name: Oleh
+  address:
+    city: Kyiv
+settings: {}
+```
 
-## 13. Errors
+A block header must have non-empty indented content. Empty objects and arrays
+are written as `{}` and `[]`. A length (`key[N]:`) or field list (`key{a}:`)
+makes the block an array; a block of fields after such a header is an error.
 
-Invalid syntax must produce an error rather than executing code.
+Duplicate keys in one object are an error, including keys that differ only in
+quoting (`a` and `"a"`).
 
-Error categories include:
+## 12. Indentation, blank lines, and comments
 
-- Invalid key
-- Duplicate key
-- Invalid indentation
-- Invalid escape sequence
-- Missing value
-- Malformed collection
-- Unsupported numeric representation
+- One level is exactly two ASCII spaces. Root lines have no indentation.
+- Indentation may increase by one level at a time, except for blocks opened on
+  a dash line (two levels, §9). It may decrease to any open level.
+- Blank lines do not affect structure.
+- A line whose first non-space character is `#` is a comment, except inside a
+  text block. Comments do not affect structure.
+- There are no inline comments: `#` after a value is part of the value.
+- Supported nesting depth is at least 128 levels; implementations may reject
+  deeper documents with a resource-limit error.
 
-Implementations should report source line and column positions where possible.
+## 13. Serialization
 
-## 14. Security
+A compliant serializer preserves values, types, and key order:
 
-AXS is a data format, not a programming language.
+`parse(stringify(value)) == value`, including key order, integer vs float, and
+float bits.
 
-A parser must not execute arbitrary code contained in a document.
+The canonical form chosen by the reference serializer:
 
-The Rust implementation enforces fixed limits of 128 block levels, 8 MiB per
-input/output document, and 262,144 tokens including structural tokens and EOF.
-Resource-limit errors use `AXS002` for depth and `AXS009` for size/token count.
-See `../PARSER_STATUS.md` for the implemented grammar and known limitations.
+- `key: value` with one space after `:` and none before it;
+- unquoted keys and strings whenever the rules allow;
+- arrays: table, else inline array, else block array (§10);
+- lengths on every non-empty array;
+- text blocks for strings containing LF when allowed (§8);
+- no comments, no blank lines.
 
-## 15. Compatibility
+Serialization is not required to preserve comments, whitespace, or the
+author's choice between equivalent forms.
 
-This specification is experimental.
+## 14. Errors
 
-Syntax and semantic rules may change before version 1.0.
+Invalid documents must produce an error, never a partial result. Implementations
+should report line and column. Error categories:
 
-The specification draft version is independent of the Rust crate version.
-The current Rust manifest remains 0.1.0. A stable 1.x release must preserve
-documented grammar, supported type mappings, and error codes; incompatible
-changes require a major release. See `../README.md` for the proposed versioning
-policy and `../RELEASE_AUDIT.md` for outstanding release conditions.
+- Invalid key, duplicate key
+- Invalid indentation, mixed array/object block, empty block
+- Invalid escape or unterminated string
+- Malformed inline array, table header, or table row (wrong cell count)
+- Array length mismatch
+- Invalid or empty text block
+- Unsupported numeric value (overflow, non-finite)
+- Resource limit exceeded
 
-## 16. Formal structural grammar
+Repairing likely model mistakes (wrong indentation width, `=` instead of `:`,
+truncated output, unquoted commas) belongs to a separate repair mode that reports
+every change it makes. Repair mode is specified separately and is not part of
+this grammar.
 
-This indentation-aware EBNF uses lexer tokens. `NL` is a content-line newline;
-blank/comment lines emit no tokens. `INDENT`/`DEDENT` each change one two-space
-level, and `VALUE` is the existing primitive/empty-collection syntax from above.
-The lexer classifies each entire line; delimiters inside VALUE are opaque.
+## 15. Security
+
+AXS is data, not a programming language. A parser must not execute code,
+resolve references, or include external content. Implementations should bound
+input size, token count, and depth. The Rust implementation's current limits
+are listed in [PARSER_STATUS.md](../PARSER_STATUS.md).
+
+## 16. JSON mapping
+
+| JSON | AXS |
+|---|---|
+| object | object, same key order |
+| array | array |
+| string | string |
+| number without `.`/exponent, fits `i64` | integer |
+| other finite number | float |
+| `true`/`false`/`null` | same |
+
+An integer outside the `i64` range cannot be represented and is an error.
+Converting AXS to JSON writes integers without a fractional part and floats
+with one (or with an exponent), so the integer/float distinction survives a
+round trip through JSON text.
+
+## 17. Formal structural grammar
+
+This indentation-aware EBNF is written over logical lines. `NL` ends a content
+line; blank and comment lines produce nothing. `INDENT`/`DEDENT` change one
+two-space level. `SCALAR` is a primitive or `[]`/`{}`; `INLINE` is an inline
+array; `TEXT` is a text block's content lines. Semantic rules from the sections
+above (duplicate keys, lengths, cell counts, depth) apply on top of it.
 
 ```ebnf
-document      = object, EOF ;
-object        = { field } ;
-field         = key, "=", VALUE, NL | key, ":", NL, INDENT, block, DEDENT ;
-block         = nonempty_object | array ;
-nonempty_object = field, { field } ;
-array         = item, { item } ;
-item          = "-", VALUE, NL
-              | "-", NL, INDENT, block, DEDENT
-              | "-", key, "=", VALUE, NL, [ INDENT, nonempty_object, DEDENT ]
-              | "-", key, ":", NL, INDENT, INDENT, block, DEDENT,
-                object, DEDENT ;
-key           = ( ASCII_LETTER | "_" ), { ASCII_LETTER | ASCII_DIGIT | "_" | "-" } ;
+document     = { field } , EOF ;
+field        = key , len? , ":" , SP , ( SCALAR | INLINE ) , NL
+             | key , ":" , SP , "|" , NL , INDENT , TEXT , DEDENT
+             | key , len? , ":" , NL , INDENT , block , DEDENT
+             | key , len? , cols , ":" , NL , INDENT , rows , DEDENT ;
+block        = field , { field } | item , { item } ;
+item         = "-" , SP , ( SCALAR | INLINE ) , NL
+             | "-" , SP , "|" , NL , INDENT , TEXT , DEDENT
+             | "-" , NL , INDENT , block , DEDENT
+             | "-" , SP , inline_field , [ INDENT , field , { field } , DEDENT ] ;
+inline_field = key , len? , ":" , SP , ( SCALAR | INLINE ) , NL
+             | key , ":" , SP , "|" , NL , INDENT , INDENT , TEXT , DEDENT , DEDENT
+             | key , len? , ":" , NL , INDENT , INDENT , block , DEDENT , DEDENT
+             | key , len? , cols , ":" , NL , INDENT , INDENT , rows , DEDENT , DEDENT ;
+rows         = row , { row } ;
+row          = "-" , SP , cell , { "," , cell } , NL ;
+cols         = "{" , key , { "," , key } , "}" ;
+len          = "[" , DIGITS , "]" ;
+key          = bare_key | QUOTED ;
+bare_key     = ( ASCII_LETTER | "_" ) , { ASCII_LETTER | ASCII_DIGIT | "_" | "-" | "." } ;
 ```
 
-For the last item production the first INDENT is the implicit inline-object
-level; the second is the named child collection. Additional fields share the
-implicit object level. Semantic constraints prohibit duplicate keys, mixed
-array/object blocks, and depth above 128. Empty documents represent empty root
-objects; empty nested collections appear only as VALUE (`[]` or `{}`).
+In the `inline_field` forms, the trailing `[ INDENT , field ... ]` of `item`
+holds the continuation fields at the implicit object level, one level deeper
+than the dash; the inner `INDENT , INDENT` pairs open the implicit object and
+the named child. Optional spaces are allowed around `,`, inside `[ ]` and `{ }`,
+and before `:`; the canonical form uses `, ` and no space before `:`.
 
-## 17. Migration from bare blocks
+## 18. Compatibility
 
-This is a deliberate breaking grammar change before stable 1.0. All parser
-entry points reject bare block keys, and mixed old/new syntax is invalid.
-API function signatures, primitive typing, escaping, and resource limits remain
-unchanged. `TokenKind::Colon` is a new public variant. No legacy grammar mode or
-second parser is provided.
-
-Old syntax (rejected):
-
-```axs-legacy
-user
-  name = Oleh
-skills
-  - Rust
-users
-  - name = Oleh
-    skills
-      - Rust
-```
-
-New syntax:
-
-```text
-user:
-  name = Oleh
-skills:
-  - Rust
-users:
-  - name = Oleh
-    skills:
-      - Rust
-```
-
-Add `:` to each named nonempty block header, including continuation fields in
-inline objects. Keep scalar/empty-collection assignments and bare array dashes
-unchanged. Review array strings containing a valid-key colon prefix and quote
-them when intended as text. Do not append colons inside assigned values or
-quoted strings. No automatic text-replacement migration is provided.
+This specification is experimental and may change before 1.0. Grammar v3 is not
+compatible with Grammar v2, which is preserved in [AXS-v2.md](AXS-v2.md) for
+reference. Conformance fixtures live in `tests/conformance/` and are normative
+examples of this specification.
