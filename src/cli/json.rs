@@ -208,7 +208,11 @@ impl<'de> Deserialize<'de> for RawArray<'de> {
 }
 
 pub(super) fn to_json(object: Object) -> Result<Vec<u8>, AxsError> {
-    let value = json_value(AxsValue::Object(object))?;
+    value_to_json(AxsValue::Object(object))
+}
+
+pub(super) fn value_to_json(value: AxsValue) -> Result<Vec<u8>, AxsError> {
+    let value = json_value(value)?;
     let mut output = BoundedOutput(Vec::new());
     serde_json::to_writer_pretty(&mut output, &value).map_err(|error| {
         AxsError::new(

@@ -5,6 +5,13 @@
 No published release history was verified. The manifest is still 0.1.0; earlier
 development milestone labels are not asserted to be crates.io releases.
 
+### Added: queries
+
+- `axs::query` and `axs query [--from-json] [--json] QUERY FILE` select,
+  filter, and project data: `users[age > 20]{name}`, `users[-1]`,
+  `issues[state == open and labels.name ~ bug].number` (spec/QUERY.md).
+  `ErrorKind` adds `InvalidQuery` (AXS012); errors name available fields.
+
 ### Breaking grammar change: Grammar v3
 
 - Grammar v3 replaces v2 without a migration mode (spec/AXS.md; v2 kept as

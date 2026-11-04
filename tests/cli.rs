@@ -672,3 +672,70 @@ fn format_keeps_key_order_unless_sort_keys_is_requested() {
         "user:\n  b[1]: [3]\n  y: 2\nz: 1\n"
     );
 }
+
+#[test]
+fn query_selects_filters_and_projects() {
+    let fixture = Fixture::new();
+    let path = fixture.file(
+        "data.axs",
+        "users[3]{name,age}:\n  Oleh,22\n  Alex,25\n  Maria,31\n",
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_axs"))
+        .args(["query", "users"])
+        .output()
+        .unwrap();
+    status(&output, 2);
+    let run = |flags: &[&str], text: &str| {
+        Command::new(env!("CARGO_BIN_EXE_axs"))
+            .arg("query")
+            .args(flags)
+            .arg("--")
+            .arg(text)
+            .arg(&path)
+            .output()
+            .unwrap()
+    };
+    let output = run(&[], "users[age > 22]{name}");
+    status(&output, 0);
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "result[2]{name}:\n  Alex\n  Maria\n"
+    );
+    let output = run(&[], "users[0]");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "name: Oleh\nage: 22\n"
+    );
+    let output = run(&["--json"], "users.age");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "[\n  22,\n  25,\n  31\n]\n"
+    );
+    let output = run(&[], "users[age = 1]");
+    status(&output, 1);
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("AXS012") && stderr.contains("query:1:11"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn query_reads_json_input() {
+    let fixture = Fixture::new();
+    let path = fixture.file(
+        "data.json",
+        r#"{"items":[{"id":1,"ok":true},{"id":2,"ok":false}]}"#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_axs"))
+        .args(["query", "--from-json", "--", "items[ok == true].id"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    status(&output, 0);
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "result[1]: [1]\n"
+    );
+}

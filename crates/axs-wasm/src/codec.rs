@@ -105,6 +105,7 @@ pub fn kind_name(kind: ErrorKind) -> &'static str {
         ErrorKind::SyntaxError => "SyntaxError",
         ErrorKind::LengthMismatch => "LengthMismatch",
         ErrorKind::InvalidCollection => "InvalidCollection",
+        ErrorKind::InvalidQuery => "InvalidQuery",
     }
 }
 

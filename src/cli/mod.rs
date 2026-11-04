@@ -38,6 +38,18 @@ enum Command {
     ToJson { file: PathBuf },
     /// Write canonical AXS to stdout from an object-root JSON file.
     FromJson { file: PathBuf },
+    /// Select part of a document, as in 'users[age > 20]{name}', and write it
+    /// to stdout. Results that are not objects are written under `result`.
+    Query {
+        query: String,
+        file: PathBuf,
+        /// Read the input file as JSON instead of AXS.
+        #[arg(long)]
+        from_json: bool,
+        /// Write the result as JSON instead of AXS.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 struct Failure {
@@ -92,10 +104,38 @@ fn run(command: Command) -> Result<(), Failure> {
         Command::Check { file }
         | Command::Fmt { file, .. }
         | Command::ToJson { file }
-        | Command::FromJson { file } => file,
+        | Command::FromJson { file }
+        | Command::Query { file, .. } => file,
     };
     let in_place = matches!(command, Command::Fmt { check: false, .. });
     let loaded = files::read(path, in_place)?;
+    if let Command::Query {
+        query,
+        from_json,
+        json,
+        ..
+    } = &command
+    {
+        let tree = if *from_json {
+            json::from_json(&loaded.source)
+        } else {
+            axs::parse(&loaded.source)
+        }
+        .map_err(|error| Failure::document(error, &loaded.source, path))?;
+        let result = axs::query(&tree, query)
+            .map_err(|error| Failure::document(error, query, std::path::Path::new("query")))?;
+        let encoded = if *json {
+            json::value_to_json(result)
+        } else {
+            let document = match result {
+                axs::AxsValue::Object(object) => object,
+                other => axs::AxsObject::from([("result".to_owned(), other)]),
+            };
+            axs::serializer::stringify_typed(&document).map(String::into_bytes)
+        }
+        .map_err(|error| Failure::document(error, "", path))?;
+        return stdout(&encoded);
+    }
     if matches!(command, Command::FromJson { .. }) {
         let tree = json::from_json(&loaded.source)
             .map_err(|error| Failure::document(error, &loaded.source, path))?;
@@ -126,7 +166,9 @@ fn run(command: Command) -> Result<(), Failure> {
                 .map_err(|error| Failure::document(error, &loaded.source, path))?;
             stdout(&encoded)
         }
-        Command::FromJson { .. } => Err(Failure::invalid("Unexpected conversion command")),
+        Command::FromJson { .. } | Command::Query { .. } => {
+            Err(Failure::invalid("Unexpected conversion command"))
+        }
     }
 }
 

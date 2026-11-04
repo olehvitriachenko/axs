@@ -113,6 +113,7 @@ signatures and use the same Grammar v3 parser.
 | AXS009 | Syntax/resource limit (document bytes or token count) |
 | AXS010 | Declared array length does not match |
 | AXS011 | Malformed inline array, inline object, table header, or table row |
+| AXS012 | Invalid query or query evaluation error (see spec/QUERY.md) |
 
 Spans are one-based lines and Unicode scalar columns/lengths. Invalid values
 highlight their token; duplicate keys highlight the duplicate; a missing value
@@ -122,14 +123,15 @@ and escapes control characters.
 
 Public API changes from Grammar v2: `AxsValue::Object` and the parse result are
 `AxsObject` instead of `HashMap`; `TokenKind` drops `Equals` and adds `Length`,
-`Columns`, `Items`, `Fields`, and `Text`, and table rows no longer emit `Dash`; `ErrorKind` adds `LengthMismatch` and
-`InvalidCollection`. Serde deserialization visits fields in document order, and
+`Columns`, `Items`, `Fields`, and `Text`, and table rows no longer emit `Dash`;
+`ErrorKind` adds `LengthMismatch`, `InvalidCollection`, and `InvalidQuery`.
+Serde deserialization visits fields in document order, and
 serialization keeps struct field order (a `HashMap` keeps its own iteration
 order, as with serde_json).
 
 ## Verification and remaining limitations
 
-Grammar v3 verification: 201 integration tests, two CLI unit tests, and one
+Grammar v3 verification: 213 integration tests, two CLI unit tests, and one
 README doctest. `tests/conformance.rs` runs every fixture in
 `tests/conformance/` (21 valid documents with expected JSON, 23 invalid
 documents) and checks canonical round trips. `tests/grammar_v3.rs` covers
@@ -146,8 +148,11 @@ reproducible sampling, not exhaustive proof, and have no automatic shrinking.
 No cargo-fuzz harness was added. Serde integration is documented separately in
 `SERDE_STATUS.md`.
 
-Remaining limitations: no repair mode for model mistakes, no query language,
-no inline comments, streaming parser, or configurable budgets. Comments and
+Queries (`axs::query`, `axs query`) are specified in spec/QUERY.md and covered
+by `tests/query.rs` and CLI tests.
+
+Remaining limitations: no repair mode for model mistakes, no query functions,
+aggregation, or sorting, no inline comments, streaming parser, or configurable budgets. Comments and
 source formatting are not preserved. JSON documents with non-object roots are
 rejected by `axs from-json` rather than wrapped. Fixed budgets bound document
 processing, not total caller-owned memory. Diagnostic columns do not account

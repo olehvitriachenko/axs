@@ -3,6 +3,7 @@
 pub mod error;
 pub mod lexer;
 pub mod parser;
+pub mod query;
 mod serde_support;
 pub mod serializer;
 pub mod string;
@@ -21,6 +22,9 @@ pub use lexer::tokenize;
 // Parser
 pub use token_parser::parse_tokens;
 pub use token_parser::parse_tokens as parse;
+
+// Queries
+pub use query::query;
 
 // Serializer
 pub use serializer::stringify;

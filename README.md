@@ -109,6 +109,22 @@ nodes, and string/key bytes. Grammar, mappings, errors, and remaining validation
 work are documented in [PARSER_STATUS.md](PARSER_STATUS.md) and
 [SERDE_STATUS.md](SERDE_STATUS.md). This milestone does not declare AXS 1.0 ready.
 
+## Queries
+
+`axs::query` and `axs query` select part of a document before it reaches a
+model ([specification](spec/QUERY.md)):
+
+```text
+users[age > 20]{name,email}
+issues[state == open and labels.name ~ bug]{number,title}
+```
+
+Steps are `.field`, `[N]` (negative from the end), `[*]`, `[condition]`, and
+`{a,b}` projections; conditions use `== != > >= < <= ~` with `and`, `or`, and
+parentheses. On the benchmark's GitHub issues, selecting the open issues'
+number, title, and comment count is 310 tokens instead of 3,937 for the whole
+document as minified JSON. Errors use `AXS012` and name the available fields.
+
 ## Command-line interface
 
 Install from this checkout (no registry publication is assumed):
@@ -128,6 +144,8 @@ axs fmt config.axs
 axs fmt --sort-keys config.axs
 axs to-json config.axs > converted.json
 axs from-json config.json > converted.axs
+axs query 'users[age > 20]{name,email}' config.axs
+axs query --from-json --json 'items[state == open].number' issues.json
 axs check --help
 axs fmt --help
 axs to-json --help
