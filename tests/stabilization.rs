@@ -354,11 +354,9 @@ fn serializer_rejects_excessive_depth_before_recursing_further() {
             };
         }
         roundtrip(value.clone());
-        // The innermost array of primitives is written inline, one level up.
-        let mut value = AxsValue::Array(vec![value]);
-        if use_arrays {
-            value = AxsValue::Array(vec![value]);
-        }
+        // The innermost array or object of primitives is written inline, one
+        // level up, so it takes two more levels to exceed the limit.
+        let value = AxsValue::Array(vec![AxsValue::Array(vec![value])]);
         assert!(
             stringify(&AxsObject::from([("value".into(), value)]))
                 .unwrap_err()

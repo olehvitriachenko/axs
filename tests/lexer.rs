@@ -84,14 +84,13 @@ fn tokenizes_inline_array_with_length() {
 #[test]
 fn tokenizes_table() {
     assert_eq!(
-        kinds("users{id, \"@n\"}:\n  - 1, Oleh"),
+        kinds("users{id, \"@n\"}:\n  1,Oleh"),
         vec![
             TokenKind::Identifier("users".into()),
             TokenKind::Columns(vec!["id".into(), "@n".into()]),
             TokenKind::Colon,
             TokenKind::Newline,
             TokenKind::Indent,
-            TokenKind::Dash,
             TokenKind::Items(vec!["1".into(), "Oleh".into()]),
             TokenKind::Newline,
             TokenKind::Dedent,
@@ -199,4 +198,15 @@ fn rejects_invalid_key() {
 #[test]
 fn rejects_v2_assignment() {
     assert!(tokenize("name = Oleh").is_err());
+}
+
+#[test]
+fn tokenizes_inline_object() {
+    assert_eq!(
+        kinds("user: {a: 1,\"b c\": \"x, y\"}")[2],
+        TokenKind::Fields(vec![
+            ("a".into(), "1".into()),
+            ("b c".into(), "\"x, y\"".into())
+        ])
+    );
 }

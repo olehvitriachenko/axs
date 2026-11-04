@@ -21,6 +21,10 @@ development milestone labels are not asserted to be crates.io releases.
 - `TokenKind` drops `Equals` and adds `Length`, `Columns`, `Items`, `Text`.
   `ErrorKind` adds `LengthMismatch` (AXS010) and `InvalidCollection` (AXS011).
 - Normative conformance fixtures in `tests/conformance/`.
+- Token-driven canonical form: commas without spaces, table rows without a `-`
+  prefix (a dashed row is now an error), and inline objects `{a: 1,b: x}` for
+  objects of up to four primitive fields. Measured in `bench/tokens/`: 14.6%
+  fewer tokens than minified JSON overall (TOON 4.4.0: 14.3%).
 
 ### Breaking grammar change: Grammar v2
 

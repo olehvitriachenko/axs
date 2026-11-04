@@ -13,6 +13,9 @@ pub fn parse_tokens(source: &str) -> Result<AxsObject, AxsError> {
     Ok(object)
 }
 
+const PRIMITIVES_ONLY: &str =
+    "Inline arrays, inline objects, and table cells hold only primitive values";
+
 /// The optional `[N]` and `{a, b}` parts of a field header.
 struct Header {
     length: Option<(usize, SourceSpan)>,
@@ -153,32 +156,44 @@ impl<'a> TokenParser<'a> {
                         .error(ErrorKind::InvalidCollection, "Empty element")
                         .with_help("Remove the extra ',' or write an empty string as \"\""));
                 }
-                if !item.starts_with('"') && item.contains(['[', ']']) {
+                if !item.starts_with('"') && item.contains(['[', ']', '{', '}']) {
                     return Err(self
-                        .error(
-                            ErrorKind::InvalidCollection,
-                            "Inline arrays and table cells hold only primitive values",
-                        )
-                        .with_help(
-                            "Use a block array for nested collections, or quote the string",
-                        ));
+                        .error(ErrorKind::InvalidCollection, PRIMITIVES_ONLY)
+                        .with_help("Use a block for nested collections, or quote the string"));
                 }
                 match self.scalar(item)? {
-                    AxsValue::Array(_) | AxsValue::Object(_) => Err(self.error(
-                        ErrorKind::InvalidCollection,
-                        "Inline arrays and table cells hold only primitive values",
-                    )),
+                    AxsValue::Array(_) | AxsValue::Object(_) => {
+                        Err(self.error(ErrorKind::InvalidCollection, PRIMITIVES_ONLY))
+                    }
                     value => Ok(value),
                 }
             })
             .collect()
     }
 
-    /// A scalar, inline array, or text block value followed by its newline.
+    fn inline_object(&self, fields: &[(String, String)]) -> Result<AxsObject, AxsError> {
+        let raw: Vec<String> = fields.iter().map(|(_, value)| value.clone()).collect();
+        let values = self.elements(&raw)?;
+        let mut object = AxsObject::new();
+        for ((key, _), value) in fields.iter().zip(values) {
+            if object.contains_key(key) {
+                return Err(self.error(
+                    ErrorKind::DuplicateKey,
+                    &format!("Duplicate key '{key}' in inline object"),
+                ));
+            }
+            object.insert(key.clone(), value);
+        }
+        Ok(object)
+    }
+
+    /// A scalar, inline array, inline object, or text block value followed by
+    /// its newline.
     fn read_value(&mut self) -> Result<AxsValue, AxsError> {
         let value = match self.kind() {
             Some(TokenKind::Value(raw)) => self.scalar(raw)?,
             Some(TokenKind::Items(items)) => AxsValue::Array(self.elements(items)?),
+            Some(TokenKind::Fields(fields)) => AxsValue::Object(self.inline_object(fields)?),
             Some(TokenKind::Text(text)) => AxsValue::String(text.clone()),
             Some(TokenKind::Eof) | None => {
                 return Err(self.error(ErrorKind::UnexpectedEof, "Expected value"));
@@ -381,13 +396,8 @@ impl<'a> TokenParser<'a> {
         let mut rows = Vec::new();
 
         while !matches!(self.kind(), Some(TokenKind::Dedent | TokenKind::Eof) | None) {
-            if !matches!(self.kind(), Some(TokenKind::Dash)) {
-                return Err(self.error(ErrorKind::InvalidCollection, "Expected a table row"));
-            }
-            self.advance();
-
             let Some(TokenKind::Items(cells)) = self.kind() else {
-                return Err(self.error(ErrorKind::InvalidCollection, "Expected table cells"));
+                return Err(self.error(ErrorKind::InvalidCollection, "Expected a table row"));
             };
             if cells.len() != columns.len() {
                 return Err(self.error(
@@ -437,10 +447,13 @@ impl<'a> TokenParser<'a> {
             self.advance();
 
             let value = match self.kind() {
-                // - Rust, - [a, b], - |
-                Some(TokenKind::Value(_) | TokenKind::Items(_) | TokenKind::Text(_)) => {
-                    self.read_value()?
-                }
+                // - Rust, - [a, b], - {a: 1}, - |
+                Some(
+                    TokenKind::Value(_)
+                    | TokenKind::Items(_)
+                    | TokenKind::Fields(_)
+                    | TokenKind::Text(_),
+                ) => self.read_value()?,
 
                 // -
                 //   - Rust

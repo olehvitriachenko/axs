@@ -1,13 +1,13 @@
 name: Oleh
 age: 22
 
-users{name, age}:
-  - Oleh, 22
-  - Alex, 25
+users{name,age}:
+  Oleh,22
+  Alex,25
 
 projects:
   - title: AXS
-    tags: [rust, typescript, llm]
+    tags: [rust,typescript,llm]
     description: |
       A compact data format for language models.
       Fewer tokens than JSON, same data model.
@@ -16,7 +16,8 @@ projects:
     tags: []
 
 settings: {}
+owner: {name: Oleh,city: Kyiv}
 
 matrix:
-  - [1, 2]
-  - [3, 4]
+  - [1,2]
+  - [3,4]

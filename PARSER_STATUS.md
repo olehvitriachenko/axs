@@ -18,8 +18,9 @@ within an object are errors, including `a` and `"a"`.
   later colons, `=`, and `#` belong to the value.
 - `key:` followed by a block indented one level introduces a nonempty object or
   array. The first entry selects the block type; mixing is an error. `key[N]:`
-  and `key[N]: [...]` declare a length that must match. `key{a, b}:` is a table
-  whose `- x, y` rows each become an object with the header's keys.
+  and `key[N]: [...]` declare a length that must match. `key{a,b}:` is a table
+  whose `x,y` rows (no `-` prefix) each become an object with the header's keys.
+  `key: {a: 1,b: x}` is an inline object of primitive values.
 - `- value` is an array element. A bare `-` requires a nested block.
 - `- key: value` starts an inline array object; further fields are two spaces
   deeper than the dash. When the first field opens a block (object, array,
@@ -28,9 +29,11 @@ within an object are errors, including `a` and `"a"`.
 - After `- `, content is a field only when a bare or quoted key is followed by
   `:` and then a space or the line end. Otherwise it is a scalar, so
   `- http://host`, `- 10:30`, and `- bad key: x` are strings.
-- Inline arrays and table cells hold primitives only and split on commas outside
-  quotes; only a leading `"` opens a quoted element. Empty elements, trailing
-  commas, nested collections, and unquoted `[`/`]` are errors.
+- Inline arrays, inline objects, and table cells hold primitives only and split
+  on commas outside quotes; only a leading `"` (or, in inline objects, one right
+  after `: `) opens a quoted element. Empty elements, trailing commas, nested
+  collections, and unquoted `[`, `]`, `{`, `}` are errors. A table row that is
+  `-` or starts with `- ` is an error.
 - Text blocks keep everything indented one level deeper than their key (tabs,
   `#`, quotes) with that indentation removed, join lines with LF, drop trailing
   blank lines, and have no final newline. They need one non-blank line.
@@ -69,7 +72,8 @@ For a root object with supported finite values within the limits below,
 key order, writes arrays of uniform primitive-valued objects as tables, arrays of
 primitives inline, and everything else as blocks; writes lengths on every
 nonempty array; uses text blocks for multiline strings they can represent; and
-quotes keys and strings only where their position requires it. Floats use the
+writes objects with one to four primitive fields inline, uses `,` without
+spaces, and quotes keys and strings only where their position requires it. Floats use the
 shortest round-trip digits, with exponents only below `1e-6` or from `1e21`, as
 in JavaScript; the encoding is re-parsed and bit-checked before it is returned.
 `value::sort_keys` (and `axs fmt --sort-keys`) sorts keys recursively.
@@ -108,7 +112,7 @@ signatures and use the same Grammar v3 parser.
 | AXS008 | Numeric range/non-finite conversion error |
 | AXS009 | Syntax/resource limit (document bytes or token count) |
 | AXS010 | Declared array length does not match |
-| AXS011 | Malformed inline array, table header, or table row |
+| AXS011 | Malformed inline array, inline object, table header, or table row |
 
 Spans are one-based lines and Unicode scalar columns/lengths. Invalid values
 highlight their token; duplicate keys highlight the duplicate; a missing value
@@ -118,16 +122,16 @@ and escapes control characters.
 
 Public API changes from Grammar v2: `AxsValue::Object` and the parse result are
 `AxsObject` instead of `HashMap`; `TokenKind` drops `Equals` and adds `Length`,
-`Columns`, `Items`, and `Text`; `ErrorKind` adds `LengthMismatch` and
+`Columns`, `Items`, `Fields`, and `Text`, and table rows no longer emit `Dash`; `ErrorKind` adds `LengthMismatch` and
 `InvalidCollection`. Serde deserialization visits fields in document order, and
 serialization keeps struct field order (a `HashMap` keeps its own iteration
 order, as with serde_json).
 
 ## Verification and remaining limitations
 
-Grammar v3 verification: 200 integration tests, two CLI unit tests, and one
+Grammar v3 verification: 201 integration tests, two CLI unit tests, and one
 README doctest. `tests/conformance.rs` runs every fixture in
-`tests/conformance/` (20 valid documents with expected JSON, 18 invalid
+`tests/conformance/` (21 valid documents with expected JSON, 23 invalid
 documents) and checks canonical round trips. `tests/grammar_v3.rs` covers
 canonical forms, tables, text blocks, inline blocks, positions, quoting in each
 position, depth 128 boundaries, budgets, Serde, and a fixed-seed property test.

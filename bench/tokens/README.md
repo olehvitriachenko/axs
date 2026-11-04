@@ -35,7 +35,21 @@ python3 generate.py
 `run.py` uses `target/debug/axs` unless `AXS_BIN` points elsewhere, and
 rewrites `RESULTS.md`.
 
-## Findings (2026-11-04, AXS at commit 0e64716)
+## Current results
+
+After the canonical-form changes below (o200k_base, vs minified JSON):
+
+| JSON (indent 2) | JSON (minified) | YAML | TOON | AXS |
+|---:|---:|---:|---:|---:|
+| 24,393 | 16,464 | 19,549 (+18.7%) | 14,110 (−14.3%) | **14,061 (−14.6%)** |
+
+Per dataset AXS matches TOON on tables (file listing −23.0%, SQL rows −28.5%,
+search results −13.5%) and is slightly ahead on nested data (GitHub issues
++13.0% vs +14.1%, nested config +19.4% vs +20.9%), but nested, non-tabular data
+still costs more than minified JSON in every indentation-based format.
+cl100k_base and Llama 3 give the same ranking.
+
+## First run (2026-11-04, AXS at commit 0e64716)
 
 Totals for o200k_base (fewer is better; percentages vs minified JSON):
 
@@ -66,5 +80,7 @@ data the Llama 3 counts matched cl100k_base exactly.
    The space after commas costs ~900 tokens and the row dash ~330. Text blocks
    cost ~33 tokens more than quoted strings with `\n`, which is negligible.
 
-These variants were measured with a throwaway re-encoder, not the Rust
-serializer; adopting any of them is a grammar/serializer decision.
+These variants were measured with a throwaway re-encoder. All three (`,`
+without spaces, table rows without `-`, inline objects of up to four
+primitive fields) were then adopted in the grammar and serializer, and text
+blocks were kept; the measured result is in "Current results" above.

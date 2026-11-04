@@ -17,7 +17,7 @@ fn canonical(source: &str, expected: &str) {
 fn objects_keep_key_order_and_arrays_get_lengths() {
     canonical(
         "user:\n  name: Oleh\n  age: 22\nskills:\n  - Rust\n  - TypeScript\n",
-        "user:\n  name: Oleh\n  age: 22\nskills[2]: [Rust, TypeScript]\n",
+        "user: {name: Oleh,age: 22}\nskills[2]: [Rust,TypeScript]\n",
     );
 }
 
@@ -25,7 +25,7 @@ fn objects_keep_key_order_and_arrays_get_lengths() {
 fn uniform_object_arrays_become_tables() {
     canonical(
         "users:\n  - id: 1\n    name: Oleh\n  - id: 2\n    name: \"a, b\"\n",
-        "users[2]{id, name}:\n  - 1, Oleh\n  - 2, \"a, b\"\n",
+        "users[2]{id,name}:\n  1,Oleh\n  2,\"a, b\"\n",
     );
     // Different key order, nested values, or text blocks fall back to blocks.
     canonical(
@@ -42,11 +42,11 @@ fn uniform_object_arrays_become_tables() {
 fn inline_named_blocks_stay_on_the_dash_line() {
     canonical(
         "categories:\n  - UI:\n      - MUI\n      - Tailwind\n",
-        "categories[1]:\n  - UI[2]: [MUI, Tailwind]\n",
+        "categories[1]:\n  - UI[2]: [MUI,Tailwind]\n",
     );
     canonical(
         "items:\n  - config:\n      enabled: true\n    name: first\n    tags:\n      - Rust\n  - config:\n      enabled: false\n",
-        "items[2]:\n  - config:\n      enabled: true\n    name: first\n    tags[1]: [Rust]\n  - config:\n      enabled: false\n",
+        "items[2]:\n  - config: {enabled: true}\n    name: first\n    tags[1]: [Rust]\n  - config: {enabled: false}\n",
     );
     canonical(
         "users:\n  - name: Oleh\n    skills:\n      - Rust\n    age: 22\n",
@@ -134,7 +134,7 @@ fn malformed_headers_and_values_are_rejected() {
         "key: [x] y",
         "rows{a, b}:\n  - 1, 2, 3",
         "rows{a}:\n  -",
-        "rows{a}:\n  x: 1",
+        "rows{a}:\n  - 1",
     ] {
         assert!(parse(source).is_err(), "{source}");
     }
@@ -393,7 +393,7 @@ fn serde_and_demo_use_the_shared_parser_and_serializer() {
     assert_eq!(value.categories[0]["UI"], ["MUI", "Tailwind"]);
     assert_eq!(
         to_string(&value).unwrap(),
-        "categories[1]:\n  - UI[2]: [MUI, Tailwind]\n"
+        "categories[1]:\n  - UI[2]: [MUI,Tailwind]\n"
     );
     assert_eq!(
         from_str::<Categories>(&to_string(&value).unwrap()).unwrap(),

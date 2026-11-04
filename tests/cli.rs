@@ -315,7 +315,7 @@ fn json_to_axs_is_canonical_v3_and_keeps_input_unchanged() {
     assert!(output.stderr.is_empty());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "z: null\nuser:\n  name: Олег\n  skills[2]: [UI:, name: value]\nempty: {}\n"
+        "z: null\nuser:\n  name: Олег\n  skills[2]: [UI:,name: value]\nempty: {}\n"
     );
     assert_eq!(fs::read_to_string(path).unwrap(), source);
 }
@@ -653,7 +653,7 @@ fn windows_locked_target_is_preserved_after_failed_atomic_replacement() {
 #[test]
 fn format_keeps_key_order_unless_sort_keys_is_requested() {
     let fixture = Fixture::new();
-    let path = fixture.file("input.axs", "z: 1\nuser:\n  y: 2\n  b: 3\n");
+    let path = fixture.file("input.axs", "z: 1\nuser:\n  y: 2\n  b[1]: [3]\n");
     quiet_success(&fixture.run("fmt", &path, true));
     let output = Command::new(env!("CARGO_BIN_EXE_axs"))
         .args(["fmt", "--sort-keys", "--check", "--"])
@@ -669,6 +669,6 @@ fn format_keeps_key_order_unless_sort_keys_is_requested() {
     status(&output, 0);
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
-        "user:\n  b: 3\n  y: 2\nz: 1\n"
+        "user:\n  b[1]: [3]\n  y: 2\nz: 1\n"
     );
 }

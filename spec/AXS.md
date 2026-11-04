@@ -16,7 +16,8 @@ tokens than JSON on the same data while staying unambiguous and strict.
 - Same data model as JSON, plus a distinct integer type.
 - Fewer tokens than JSON: no mandatory quotes, braces, or commas for nested
   structures, and tables for arrays of uniform objects.
-- Familiar to models: `key: value`, indentation, `[a, b]` lists, `|` text blocks.
+- Familiar to models: `key: value`, indentation, `[a,b]` lists, `{a: 1}` objects,
+  `|` text blocks.
 - Strict and deterministic: one document has exactly one meaning, and every
   invalid document is an error. Recovery from model mistakes is a separate,
   explicit repair mode, never part of the core parser.
@@ -31,9 +32,10 @@ Grammar v3 replaces Grammar v2 without a migration path.
 |---|---|
 | `name = Oleh` | `name: Oleh` |
 | `tags = []`, `config = {}` | `tags: []`, `config: {}` |
-| Arrays of scalars only as `-` blocks | Also inline: `tags: [a, b]` |
+| Arrays of scalars only as `-` blocks | Also inline: `tags: [a,b]` |
+| Small objects need a block | Also inline: `user: {name: Oleh,age: 22}` |
 | No multiline strings | `body: \|` text blocks |
-| Arrays of objects repeat every key | Tables: `users{name, age}:` |
+| Arrays of objects repeat every key | Tables: `users{name,age}:` with `Oleh,22` rows |
 | — | Optional lengths: `users[2]:` |
 | Unquoted keys only | Quoted keys: `"@type": Person` |
 | No exponent notation | `1.5e-7` is a float |
@@ -67,7 +69,7 @@ address:
 | Float | `height: 1.76` | Finite IEEE 754 binary64 |
 | Boolean | `active: true` | `true` or `false` |
 | Null | `value: null` | Absence of value |
-| Array | `tags: [a, b]` | Ordered sequence of values |
+| Array | `tags: [a,b]` | Ordered sequence of values |
 | Object | `user:` + block | Ordered map with unique string keys |
 
 Object keys are unique and **ordered**: parsing preserves source order and
@@ -118,13 +120,15 @@ A string must be quoted when it:
 - is exactly `|`;
 - contains a control character (including LF, CR, and tab), unless it is
   written as a text block (§8);
-- appears in an inline array or table cell and contains `,`, `[`, or `]`
-  (see §9 and §10);
+- appears in an inline array, inline object, or table cell and contains `,`,
+  `[`, `]`, `{`, or `}` (see §9, §10, and §11);
+- is the first cell of a table row and begins with `#`, or is `-` or begins
+  with `- ` (see §10);
 - appears as a `- ` array item and would read as an object field, such as
   `UI:` or `note: x` (see §9).
 
-Inside inline arrays and table cells only a leading `"` starts a quoted
-string, so `a"b` is an ordinary unquoted element.
+Inside inline arrays, inline objects, and table cells only a leading `"` starts
+a quoted string, so `a"b` is an ordinary unquoted element.
 
 ### Quoted strings
 
@@ -141,7 +145,7 @@ Quoted strings use `"` and support these escapes:
 | `\u{1F680}` | Unicode scalar value (1–6 hex digits) |
 
 Any other escape is an error. Nothing may follow the closing quote except
-spaces, or the `,` / `]` delimiters inside inline arrays and tables.
+spaces, or the `,`, `]`, and `}` delimiters inside inline collections and tables.
 
 ## 6. Numbers
 
@@ -222,15 +226,17 @@ uses a text block for any other string containing LF.
 An array of primitive values may be written on one line:
 
 ```axs
-tags: [rust, typescript, go]
-ids: [1, 2, 3]
-mixed: [1, two, 3.0, true, null, "a, b"]
+tags: [rust,typescript,go]
+ids: [1,2,3]
+mixed: [1,two,3.0,true,null,"a, b"]
+spaced: [a, b, c]
 empty: []
 ```
 
-Elements are separated by `,` and trimmed. Elements are primitives only (no
-nested arrays, objects, or text blocks). An unquoted element cannot contain `,`,
-`[`, or `]`. Trailing commas and empty elements are errors.
+Elements are separated by `,` and trimmed, so spaces around commas are
+allowed; the canonical form has none. Elements are primitives only (no nested
+arrays, objects, or text blocks). An unquoted element cannot contain `,`, `[`,
+`]`, `{`, or `}`. Trailing commas and empty elements are errors.
 
 ### Block arrays
 
@@ -244,11 +250,12 @@ matrix:
   -
     - 1
     - 2
-  - [3, 4]
+  - [3,4]
 ```
 
-A bare `-` opens a nested block (an array or an object). `- [a, b]` is a
-nested inline array, and `- []` / `- {}` are empty collections.
+A bare `-` opens a nested block (an array or an object). `- [a,b]` is a
+nested inline array, `- {a: 1}` an inline object (§11), and `- []` / `- {}` are
+empty collections.
 
 ### Objects inside block arrays
 
@@ -260,7 +267,7 @@ than the dash:
 users:
   - name: Oleh
     age: 22
-    skills: [Rust, TypeScript]
+    skills: [Rust,TypeScript]
   - name: Alex
     profile:
       city: Lviv
@@ -288,7 +295,7 @@ looks like a field (`- note: x`, `- UI:`) must be quoted.
 Any non-empty array may declare its length right after the key:
 
 ```axs
-tags[3]: [rust, typescript, go]
+tags[3]: [rust,typescript,go]
 skills[2]:
   - Rust
   - TypeScript
@@ -302,13 +309,13 @@ always writes them. Empty arrays are written as `[]` without a length.
 ## 10. Tables
 
 An array of objects that all have the same keys and only primitive values may
-be written as a table. The header lists the field names in braces; each `-` row
-lists the values in the same order:
+be written as a table. The header lists the field names in braces; each row is
+a line of values in the same order:
 
 ```axs
-users[2]{id, name, email, active}:
-  - 1, Oleh, oleh@example.com, true
-  - 2, Alex, null, false
+users[2]{id,name,email,active}:
+  1,Oleh,oleh@example.com,true
+  2,Alex,null,false
 ```
 
 is equivalent to:
@@ -332,8 +339,11 @@ Rules:
 - Every row has exactly as many cells as there are fields.
 - Cells follow the inline array element rules (§9): primitives only, quote
   strings containing `,` and strings that need quotes anywhere.
+- Every line at the row level is a row; rows have no `-` prefix. A row that is
+  `-` or starts with `- ` is an error, so a first cell like `- x` is quoted. A
+  line starting with `#` is a comment, so a first cell like `#tag` is quoted.
 - A table has at least one row. Rows are one level deeper than the header, or,
-  for a header on a dash line (`- users{a, b}:`), two levels deeper than the dash.
+  for a header on a dash line (`- users{a,b}:`), two levels deeper than the dash.
 - Each row becomes an object with keys in header order.
 
 The canonical serializer writes an array as a table when it has at least one
@@ -355,6 +365,25 @@ user:
     city: Kyiv
 settings: {}
 ```
+
+### Inline objects
+
+An object whose values are all primitives may be written on one line:
+
+```axs
+user: {login: ivan,id: 10003}
+limits: {cpu: 250m,memory: 512Mi}
+spaced: { a: 1 , "b c": "x, y" }
+```
+
+Fields are `key: value` pairs separated by `,`; `:` must be followed by a space.
+Values follow the inline array element rules (§9): primitives only, and quote
+strings containing `,`, `[`, `]`, `{`, or `}`. Lengths, tables, and text blocks
+are not allowed inside. Duplicate keys are an error. The canonical serializer
+writes an object inline when it has one to four fields and all of them are
+primitives that do not need a text block.
+
+### Empty and block objects
 
 A block header must have non-empty indented content. Empty objects and arrays
 are written as `{}` and `[]`. A length (`key[N]:`) or field list (`key{a}:`)
@@ -385,8 +414,10 @@ float bits.
 The canonical form chosen by the reference serializer:
 
 - `key: value` with one space after `:` and none before it;
+- `,` without spaces in inline arrays, inline objects, table headers, and rows;
 - unquoted keys and strings whenever the rules allow;
 - arrays: table, else inline array, else block array (§10);
+- objects with one to four primitive fields inline, others as blocks (§11);
 - lengths on every non-empty array;
 - text blocks for strings containing LF when allowed (§8);
 - no comments, no blank lines.
@@ -402,7 +433,8 @@ should report line and column. Error categories:
 - Invalid key, duplicate key
 - Invalid indentation, mixed array/object block, empty block
 - Invalid escape or unterminated string
-- Malformed inline array, table header, or table row (wrong cell count) — `AXS011`
+- Malformed inline array, inline object, table header, or table row (wrong cell
+  count, `-` prefix) — `AXS011`
 - Array length mismatch — `AXS010`
 - Invalid or empty text block
 - Unsupported numeric value (overflow, non-finite)
@@ -441,7 +473,8 @@ round trip through JSON text.
 This indentation-aware EBNF is written over logical lines. `NL` ends a content
 line; blank and comment lines produce nothing. `INDENT`/`DEDENT` change one
 two-space level. `SCALAR` is a primitive or `[]`/`{}`; `INLINE` is an inline
-array; `TEXT` is a text block's content lines. Semantic rules from the sections
+array or inline object; `CELL` is a primitive allowed in them (§9); `TEXT` is a
+text block's content lines. Semantic rules from the sections
 above (duplicate keys, lengths, cell counts, depth) apply on top of it.
 
 ```ebnf
@@ -460,7 +493,10 @@ inline_field = key , len? , ":" , SP , ( SCALAR | INLINE ) , NL
              | key , len? , ":" , NL , INDENT , INDENT , block , DEDENT , DEDENT
              | key , len? , cols , ":" , NL , INDENT , INDENT , rows , DEDENT , DEDENT ;
 rows         = row , { row } ;
-row          = "-" , SP , cell , { "," , cell } , NL ;
+row          = CELL , { "," , CELL } , NL ;
+INLINE       = "[" , [ CELL , { "," , CELL } ] , "]"
+             | "{" , pair , { "," , pair } , "}" ;
+pair         = key , ":" , SP , CELL ;
 cols         = "{" , key , { "," , key } , "}" ;
 len          = "[" , DIGITS , "]" ;
 key          = bare_key | QUOTED ;
@@ -471,7 +507,7 @@ In the `inline_field` forms, the trailing `[ INDENT , field ... ]` of `item`
 holds the continuation fields at the implicit object level, one level deeper
 than the dash; the inner `INDENT , INDENT` pairs open the implicit object and
 the named child. Optional spaces are allowed around `,`, inside `[ ]` and `{ }`,
-and before `:`; the canonical form uses `, ` and no space before `:`.
+and before `:`; the canonical form has none of them.
 
 ## 18. Compatibility
 

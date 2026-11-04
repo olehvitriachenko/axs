@@ -9,10 +9,11 @@ Grammar v3 (see [the specification](spec/AXS.md)):
 
 ```text
 name: Oleh
-tags[3]: [rust, typescript, llm]
-users[2]{id, name, active}:
-  - 1, Oleh, true
-  - 2, Alex, false
+tags[3]: [rust,typescript,llm]
+owner: {login: oleh,id: 1}
+users[2]{id,name,active}:
+  1,Oleh,true
+  2,Alex,false
 profile:
   city: Kyiv
   bio: |
@@ -27,15 +28,18 @@ categories:
 
 - `key: value` for scalars, `key:` plus an indented block for nested objects
   and arrays, two spaces per level.
-- `[a, b]` inline arrays of primitives, `|` text blocks for multiline strings.
-- Tables (`key{a, b}:` with `- x, y` rows) for arrays of uniform objects, which
+- `[a,b]` inline arrays and `{a: 1,b: x}` inline objects of primitives, `|`
+  text blocks for multiline strings.
+- Tables (`key{a,b}:` with `x,y` rows) for arrays of uniform objects, which
   JSON spends most of its tokens on.
 - Optional checked lengths (`key[N]`) let a reader detect truncated output.
 - Keys keep their order. Keys that are not `[A-Za-z_][A-Za-z0-9_.-]*` are quoted
   (`"@id": x`). Floats may use exponents (`1.5e-7`).
 
-The serializer picks the most compact exact form (table, inline array, or
-block) and always writes lengths. Grammar v3 replaces Grammar v2
+The serializer picks the most compact exact form (table, inline array or
+object, or block), writes commas without spaces, and always writes lengths. On
+the [token benchmark](bench/tokens/README.md) that is 14% fewer tokens than
+minified JSON overall, though nested, non-tabular data still costs more. Grammar v3 replaces Grammar v2
 ([AXS-v2.md](spec/AXS-v2.md)) without a migration mode: `key = value` and other
 v2 syntax are rejected. Normative examples live in `tests/conformance/`.
 

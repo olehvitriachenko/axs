@@ -25,7 +25,7 @@ enum Position {
     Field,
     /// `- value`
     Item,
-    /// An inline array element or a table cell.
+    /// An inline array element, inline object value, or table cell.
     Element,
 }
 
@@ -61,6 +61,8 @@ fn write_object(
     Ok(())
 }
 
+/// On the recursion path for every nesting level, so everything that does not
+/// recurse lives in separate, never-inlined helpers to keep the frame small.
 fn write_field(
     prefix: &str,
     key: &str,
@@ -69,9 +71,45 @@ fn write_field(
     output: &mut String,
 ) -> Result<(), AxsError> {
     match value {
-        AxsValue::Object(nested) if !nested.is_empty() => {
+        AxsValue::Object(nested) if !nested.is_empty() && !inline_object(nested) => {
             append(output, &format!("{prefix}{key}:\n"))?;
             write_object(nested, depth + 1, None, output)
+        }
+
+        AxsValue::Array(items)
+            if !items.is_empty() && matches!(array_form(items), ArrayForm::Block) =>
+        {
+            append(output, &format!("{prefix}{key}[{}]:\n", items.len()))?;
+            write_array(items, depth + 1, output)
+        }
+
+        _ => write_line_field(prefix, key, value, depth, output),
+    }
+}
+
+/// A field whose value fits on its line, or a table or text block below it.
+#[inline(never)]
+fn write_line_field(
+    prefix: &str,
+    key: &str,
+    value: &AxsValue,
+    depth: usize,
+    output: &mut String,
+) -> Result<(), AxsError> {
+    match value {
+        AxsValue::Object(nested) if !nested.is_empty() => {
+            let fields = nested
+                .iter()
+                .map(|(key, value)| {
+                    Ok(format!(
+                        "{}: {}",
+                        encode_key(key)?,
+                        encode_scalar(value, Position::Element)?
+                    ))
+                })
+                .collect::<Result<Vec<_>, AxsError>>()?
+                .join(",");
+            append(output, &format!("{prefix}{key}: {{{fields}}}\n"))
         }
 
         AxsValue::Array(items) if !items.is_empty() => {
@@ -82,7 +120,7 @@ fn write_field(
                         .iter()
                         .map(|column| encode_key(column))
                         .collect::<Result<Vec<_>, _>>()?
-                        .join(", ");
+                        .join(",");
                     append(output, &format!("{prefix}{key}[{count}]{{{header}}}:\n"))?;
                     check_depth(depth + 1)?;
                     let row_indent = indent(depth + 1);
@@ -91,7 +129,7 @@ fn write_field(
                             unreachable!("tables contain only objects")
                         };
                         let cells = encode_elements(row.values())?;
-                        append(output, &format!("{row_indent}- {cells}\n"))?;
+                        append(output, &format!("{row_indent}{cells}\n"))?;
                     }
                     Ok(())
                 }
@@ -99,10 +137,7 @@ fn write_field(
                     let elements = encode_elements(items.iter())?;
                     append(output, &format!("{prefix}{key}[{count}]: [{elements}]\n"))
                 }
-                ArrayForm::Block => {
-                    append(output, &format!("{prefix}{key}[{count}]:\n"))?;
-                    write_array(items, depth + 1, output)
-                }
+                ArrayForm::Block => unreachable!("block arrays are written by write_field"),
             }
         }
 
@@ -205,7 +240,14 @@ fn encode_elements<'v>(values: impl Iterator<Item = &'v AxsValue>) -> Result<Str
     Ok(values
         .map(|value| encode_scalar(value, Position::Element))
         .collect::<Result<Vec<_>, _>>()?
-        .join(", "))
+        .join(","))
+}
+
+/// Objects written on one line: a few fields, all primitive.
+const INLINE_OBJECT_FIELDS: usize = 4;
+
+fn inline_object(object: &AxsObject) -> bool {
+    !object.is_empty() && object.len() <= INLINE_OBJECT_FIELDS && object.values().all(primitive)
 }
 
 /// Strings written as `|` text blocks: multiline, and representable exactly.
@@ -317,7 +359,13 @@ fn is_safe_unquoted(value: &str, position: Position) -> bool {
         Position::Field => false,
         // Item strings must not look like inline object fields.
         Position::Item => parse_field(value).is_ok(),
-        Position::Element => value.contains([',', '[', ']']),
+        // Table rows must not start like a comment or a dash item.
+        Position::Element => {
+            value.contains([',', '[', ']', '{', '}'])
+                || value.starts_with('#')
+                || value == "-"
+                || value.starts_with("- ")
+        }
     };
 
     !structural

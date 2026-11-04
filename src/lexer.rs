@@ -23,6 +23,8 @@ pub enum TokenKind {
     Value(String),
     /// Raw inline array elements or table row cells, split on top-level commas.
     Items(Vec<String>),
+    /// Decoded keys and raw values of an inline object: `{a: 1,b: x}`.
+    Fields(Vec<(String, String)>),
     /// The decoded content of a `|` text block.
     Text(String),
     Indent,
@@ -85,8 +87,9 @@ pub(crate) fn scan_quoted(text: &str) -> Option<usize> {
 }
 
 /// Splits on commas outside quoted strings. Only a `"` that begins a part
-/// (after spaces) opens a quoted string. Fails on an unterminated quote.
-pub(crate) fn split_top_level(text: &str) -> Option<Vec<&str>> {
+/// (after spaces) opens a quoted string; with `pairs`, so does a `"` right
+/// after a `:`, for inline object values. Fails on an unterminated quote.
+pub(crate) fn split_top_level(text: &str, pairs: bool) -> Option<Vec<&str>> {
     let mut parts = Vec::new();
     let mut start = 0;
     let mut at_start = true;
@@ -108,6 +111,8 @@ pub(crate) fn split_top_level(text: &str) -> Option<Vec<&str>> {
         } else if ch == '"' && at_start {
             quoted = true;
             at_start = false;
+        } else if ch == ':' && pairs {
+            at_start = true;
         } else if ch != ' ' {
             at_start = false;
         }
@@ -241,7 +246,7 @@ pub(crate) fn parse_field(text: &str) -> Result<Field<'_>, FieldError> {
             }
         }
         let close = close.ok_or_else(malformed)?;
-        let names = split_top_level(&after[..close])
+        let names = split_top_level(&after[..close], false)
             .ok_or_else(malformed)?
             .into_iter()
             .map(decode_key)
@@ -287,6 +292,28 @@ pub(crate) fn parse_field(text: &str) -> Result<Field<'_>, FieldError> {
         colon,
         value,
     })
+}
+
+/// Splits `key: value,key: value}` (after the opening brace) into decoded
+/// keys and raw values. Lengths, columns, and nested headers are not allowed.
+fn inline_object(inner: &str) -> Option<Vec<(String, String)>> {
+    let inner = inner.strip_suffix('}')?;
+    if inner.trim().is_empty() {
+        return Some(Vec::new());
+    }
+    split_top_level(inner, true)?
+        .into_iter()
+        .map(|part| match parse_field(part.trim()) {
+            Ok(Field {
+                key,
+                length: None,
+                columns: None,
+                value: Some((value, _)),
+                ..
+            }) => Some((key, value.to_owned())),
+            _ => None,
+        })
+        .collect()
 }
 
 struct Lexer<'a> {
@@ -518,22 +545,23 @@ impl Lexer<'_> {
     }
 
     fn row(&mut self, text: &str, line: usize, column: usize) -> Result<(), AxsError> {
-        let Some(cells) = text.strip_prefix("- ") else {
+        if text == "-" || text.starts_with("- ") {
             return Err(error(
                 ErrorKind::InvalidCollection,
-                "Expected a table row",
+                "Table rows are written without '-'",
                 line,
                 column,
-                text.chars().count().max(1),
+                1,
             )
-            .with_help("Write table rows as '- value, value'"));
-        };
-        self.tokens.push(token(TokenKind::Dash, line, column));
-        self.items(cells, line, column + 2)
+            .with_help(
+                "Write table rows as 'value,value'; quote a first cell that starts with '- '",
+            ));
+        }
+        self.items(text, line, column)
     }
 
     fn items(&mut self, text: &str, line: usize, column: usize) -> Result<(), AxsError> {
-        let parts = split_top_level(text).ok_or_else(|| {
+        let parts = split_top_level(text, false).ok_or_else(|| {
             error(
                 ErrorKind::InvalidString,
                 "Unterminated quoted string",
@@ -621,6 +649,20 @@ impl Lexer<'_> {
             } else {
                 self.items(inner, line, column + 1)?;
             }
+        } else if value.starts_with('{') && value != "{}" {
+            let fields = inline_object(&value[1..]).ok_or_else(|| {
+                error(
+                    ErrorKind::InvalidCollection,
+                    "Malformed inline object",
+                    line,
+                    column,
+                    value.chars().count(),
+                )
+                .with_help("Write an inline object as '{key: value,key: value}', or quote a string starting with '{'")
+            })?;
+            self.elements += fields.len();
+            self.tokens
+                .push(token(TokenKind::Fields(fields), line, column));
         } else {
             self.tokens
                 .push(token(TokenKind::Value(value.into()), line, column));

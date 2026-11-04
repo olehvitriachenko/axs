@@ -1,5 +1,5 @@
 groups:
   - members{name}:
-      - Oleh
-      - Alex
+      Oleh
+      Alex
     label: core
