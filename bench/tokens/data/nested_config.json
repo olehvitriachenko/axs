@@ -1,0 +1,118 @@
+{
+  "version": 3,
+  "environment": "staging",
+  "services": {
+    "api": {
+      "image": "registry.example.com/api:1.10.4",
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "250m",
+          "memory": "512Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "env": {
+        "QUERY_0": "false",
+        "RELEASE_1": "Fix",
+        "USER_2": "false",
+        "MERGE_3": "false"
+      },
+      "ports": [
+        8080
+      ],
+      "healthcheck": {
+        "path": "/healthz",
+        "interval_seconds": 10,
+        "timeout_seconds": 2
+      }
+    },
+    "worker": {
+      "image": "registry.example.com/worker:1.2.5",
+      "replicas": 3,
+      "resources": {
+        "limits": {
+          "cpu": "1000m",
+          "memory": "1024Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "env": {
+        "FORMAT_0": "false",
+        "MODEL_1": "Filter parser",
+        "REQUEST_2": "false",
+        "RESULT_3": "false"
+      },
+      "ports": [
+        8080
+      ],
+      "healthcheck": {
+        "path": "/healthz",
+        "interval_seconds": 10,
+        "timeout_seconds": 2
+      }
+    },
+    "scheduler": {
+      "image": "registry.example.com/scheduler:1.8.2",
+      "replicas": 4,
+      "resources": {
+        "limits": {
+          "cpu": "1000m",
+          "memory": "256Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "env": {
+        "ERROR_0": "false",
+        "TOKEN_1": "Format",
+        "TABLE_2": "false",
+        "BRANCH_3": "false"
+      },
+      "ports": [
+        443
+      ],
+      "healthcheck": {
+        "path": "/healthz",
+        "interval_seconds": 10,
+        "timeout_seconds": 2
+      }
+    },
+    "gateway": {
+      "image": "registry.example.com/gateway:1.5.2",
+      "replicas": 5,
+      "resources": {
+        "limits": {
+          "cpu": "500m",
+          "memory": "256Mi"
+        },
+        "requests": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        }
+      },
+      "env": {
+        "FORMAT_0": "Limit",
+        "LIMIT_1": "Value",
+        "INDEX_2": "true",
+        "CONTEXT_3": "true"
+      },
+      "ports": [
+        8080
+      ],
+      "healthcheck": {
+        "path": "/healthz",
+        "interval_seconds": 10,
+        "timeout_seconds": 2
+      }
+    }
+  }
+}

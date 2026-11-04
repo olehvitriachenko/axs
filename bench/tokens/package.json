@@ -1,0 +1,9 @@
+{
+  "name": "axs-token-benchmark",
+  "private": true,
+  "type": "module",
+  "description": "TOON encoding for the AXS token benchmark",
+  "dependencies": {
+    "@toon-format/toon": "4.4.0"
+  }
+}
