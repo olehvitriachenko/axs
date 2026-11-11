@@ -2,12 +2,12 @@ use axs::{AxsValue, ErrorKind, parse};
 
 #[test]
 fn rejects_indented_root() {
-    assert!(parse("  name = Oleh").is_err());
+    assert!(parse("  name: Oleh").is_err());
 }
 
 #[test]
 fn rejects_indentation_after_scalar() {
-    assert!(parse("name = Oleh\n  age = 22").is_err());
+    assert!(parse("name: Oleh\n  age: 22").is_err());
 }
 
 #[test]
@@ -17,7 +17,7 @@ fn rejects_missing_nested_block() {
 
 #[test]
 fn rejects_duplicate_nested_key() {
-    let source = "user:\n  name = Oleh\n  name = Alex";
+    let source = "user:\n  name: Oleh\n  name: Alex";
 
     let error = parse(source).unwrap_err();
 
@@ -27,7 +27,7 @@ fn rejects_duplicate_nested_key() {
 
 #[test]
 fn rejects_duplicate_inline_object_key() {
-    let source = "users:\n  - name = Oleh\n    name = Alex";
+    let source = "users:\n  - name: Oleh\n    name: Alex";
 
     let error = parse(source).unwrap_err();
 
@@ -36,7 +36,7 @@ fn rejects_duplicate_inline_object_key() {
 
 #[test]
 fn tracks_duplicate_inline_key_position() {
-    let source = "users:\n  - name = Oleh\n    name = Alex";
+    let source = "users:\n  - name: Oleh\n    name: Alex";
 
     let error = parse(source).unwrap_err();
     let span = error.span.unwrap();
@@ -49,19 +49,19 @@ fn tracks_duplicate_inline_key_position() {
 
 #[test]
 fn preserves_quoted_equals_in_array() {
-    let source = "messages:\n  - \"Hello = World\"";
+    let source = "messages:\n  - \"Hello: World\"";
 
     let result = parse(source).unwrap();
     let AxsValue::Array(items) = &result["messages"] else {
         panic!("Expected array");
     };
 
-    assert_eq!(items[0], AxsValue::String("Hello = World".into()));
+    assert_eq!(items[0], AxsValue::String("Hello: World".into()));
 }
 
 #[test]
 fn preserves_unicode_strings() {
-    let result = parse("city = Київ\nname = Олег").unwrap();
+    let result = parse("city: Київ\nname: Олег").unwrap();
 
     assert_eq!(result["city"], AxsValue::String("Київ".into()));
     assert_eq!(result["name"], AxsValue::String("Олег".into()));
@@ -69,7 +69,7 @@ fn preserves_unicode_strings() {
 
 #[test]
 fn parses_i64_boundaries() {
-    let source = format!("min = {}\nmax = {}", i64::MIN, i64::MAX);
+    let source = format!("min: {}\nmax: {}", i64::MIN, i64::MAX);
 
     let result = parse(&source).unwrap();
 
@@ -79,14 +79,14 @@ fn parses_i64_boundaries() {
 
 #[test]
 fn preserves_leading_zero_identifier() {
-    let result = parse("code = 00123").unwrap();
+    let result = parse("code: 00123").unwrap();
 
     assert_eq!(result["code"], AxsValue::String("00123".into()));
 }
 
 #[test]
 fn rejects_unterminated_string() {
-    let error = parse("name = \"Oleh").unwrap_err();
+    let error = parse("name: \"Oleh").unwrap_err();
 
     assert_eq!(error.kind, ErrorKind::InvalidString);
 }

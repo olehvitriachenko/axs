@@ -1,0 +1,7 @@
+number_text: "123"
+bool_text: "true"
+empty: ""
+spaces: "  edge  "
+escapes: "a\"b\\c\nd\te\u{1F680}"
+bracket: "[not an array]"
+pipe: "|"

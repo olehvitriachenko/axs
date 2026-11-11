@@ -1,0 +1,10 @@
+# Allow-list: package only what the installed extension needs at runtime.
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!language-configuration.json
+!syntaxes/axs.tmLanguage.json
+!dist/extension.js
+!dist/axs_wasm_bg.wasm

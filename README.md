@@ -1,49 +1,47 @@
 # AXS
 
-AXS is a UTF-8, indentation-based data serialization format. Documents have an
-object root; nonempty objects and arrays use blocks, and indentation is two
-ASCII spaces per level. The Rust implementation includes a parser, deterministic
-serializer, structured diagnostics, and Serde integration.
+AXS is a compact, indentation-based data format with the JSON data model,
+designed for data that language models read and write: tool results,
+structured output, and context. The Rust implementation includes a parser,
+deterministic serializer, structured diagnostics, and Serde integration.
 
-Grammar v2 requires `:` on every named nonempty block:
+Grammar v3 (see [the specification](spec/AXS.md)):
 
 ```text
-user:
-  name = Oleh
-  age = 22
-skills:
-  - Rust
+name: Oleh
+tags[3]: [rust,typescript,llm]
+owner: {login: oleh,id: 1}
+users[2]{id,name,active}:
+  1,Oleh,true
+  2,Alex,false
+profile:
+  city: Kyiv
+  bio: |
+    Two lines of text,
+    no escapes needed.
 categories:
   - UI:
       - MUI
       - Tailwind
+    name: components
 ```
 
-`=` assigns primitive values or empty collections (`[]`, `{}`). A bare `-`
-introduces an unnamed nested collection. In `- UI:`, the child content is four
-spaces deeper than the dash; sibling object fields are two spaces deeper.
-Quoted strings may contain `:`, `=`, and `-` as literal text. Quote array strings
-such as `UI:` or `http://host` so they are not classified as inline object headers.
+- `key: value` for scalars, `key:` plus an indented block for nested objects
+  and arrays, two spaces per level.
+- `[a,b]` inline arrays and `{a: 1,b: x}` inline objects of primitives, `|`
+  text blocks for multiline strings.
+- Tables (`key{a,b}:` with `x,y` rows) for arrays of uniform objects, which
+  JSON spends most of its tokens on.
+- Optional checked lengths (`key[N]`) let a reader detect truncated output.
+- Keys keep their order. Keys that are not `[A-Za-z_][A-Za-z0-9_.-]*` are quoted
+  (`"@id": x`). Floats may use exponents (`1.5e-7`).
 
-This deliberately breaks the old grammar before 1.0. For example:
-
-```axs-legacy
-user
-  name = Oleh
-```
-
-must become:
-
-```text
-user:
-  name = Oleh
-```
-
-Bare named keys and documents mixing bare and colon block headers are rejected,
-including through `parse_legacy` (which preserves its signature only). See
-[the specification](spec/AXS.md) for the formal grammar and migration examples.
-Public `TokenKind` adds `Colon`; exhaustive matches must handle it. Rust API
-signatures, primitive typing, string escaping, and resource limits are retained.
+The serializer picks the most compact exact form (table, inline array or
+object, or block), writes commas without spaces, and always writes lengths. On
+the [token benchmark](bench/tokens/README.md) that is 14% fewer tokens than
+minified JSON overall, though nested, non-tabular data still costs more. Grammar v3 replaces Grammar v2
+([AXS-v2.md](spec/AXS-v2.md)) without a migration mode: `key = value` and other
+v2 syntax are rejected. Normative examples live in `tests/conformance/`.
 
 In a consuming crate, add `axs` and enable Serde's derive feature:
 
@@ -111,6 +109,22 @@ nodes, and string/key bytes. Grammar, mappings, errors, and remaining validation
 work are documented in [PARSER_STATUS.md](PARSER_STATUS.md) and
 [SERDE_STATUS.md](SERDE_STATUS.md). This milestone does not declare AXS 1.0 ready.
 
+## Queries
+
+`axs::query` and `axs query` select part of a document before it reaches a
+model ([specification](spec/QUERY.md)):
+
+```text
+users[age > 20]{name,email}
+issues[state == open and labels.name ~ bug]{number,title}
+```
+
+Steps are `.field`, `[N]` (negative from the end), `[*]`, `[condition]`, and
+`{a,b}` projections; conditions use `== != > >= < <= ~` with `and`, `or`, and
+parentheses. On the benchmark's GitHub issues, selecting the open issues'
+number, title, and comment count is 310 tokens instead of 3,937 for the whole
+document as minified JSON. Errors use `AXS012` and name the available fields.
+
 ## Command-line interface
 
 Install from this checkout (no registry publication is assumed):
@@ -127,8 +141,11 @@ Or use `cargo run -- <command> <file>` during development:
 axs check config.axs
 axs fmt --check config.axs
 axs fmt config.axs
+axs fmt --sort-keys config.axs
 axs to-json config.axs > converted.json
 axs from-json config.json > converted.axs
+axs query 'users[age > 20]{name,email}' config.axs
+axs query --from-json --json 'items[state == open].number' issues.json
 axs check --help
 axs fmt --help
 axs to-json --help
@@ -149,10 +166,11 @@ a shell can truncate a redirected file before the CLI reads it.
 | 2 | Invalid/missing command-line arguments |
 | 3 | File/read/write/replacement error, including a broken stdout pipe |
 
-Formatting uses the library's canonical Grammar v2 serializer: sorted keys,
-colon block headers, expanded array objects, canonical quoting, and LF newlines.
-**Comments, whitespace, original quoting, and input key order are lost.** Parsed
-values and their types are retained. Empty documents format to empty files.
+Formatting uses the library's canonical Grammar v3 serializer: input key order
+(or lexicographic order with `--sort-keys`), tables, inline arrays, text blocks,
+lengths on every array, canonical quoting, and LF newlines. **Comments,
+whitespace, and original quoting are lost.** Parsed values and their types are
+retained. Empty documents format to empty files.
 Canonical files are not rewritten.
 
 In-place formatting validates and serializes fully before creating a random,
@@ -207,10 +225,13 @@ columns. Conversion errors do not invent source spans.
 ## Toolchain and compatibility
 
 Minimum supported Rust version: **1.85.0** (edition 2024). The audit runs the
-locked dependency graph on that compiler, not just a newer toolchain. CI covers
-stable and 1.85.0 on Linux, macOS, and Windows. See
-[RELEASE_AUDIT.md](RELEASE_AUDIT.md) for checks actually executed and outstanding
-release conditions. The manifest remains `0.1.0`; no stable release is declared.
+locked dependency graph on that compiler, not just a newer toolchain. The
+GitHub Actions workflow defines stable and 1.85.0 jobs on Linux, macOS, and
+Windows, but it has not run yet; only macOS (aarch64) has been verified natively.
+See [RELEASE_AUDIT.md](RELEASE_AUDIT.md) and
+[RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for checks actually executed and
+outstanding release conditions. The manifest remains `0.1.0`; no stable release
+is declared.
 The local path dependency above does not assume crates.io availability.
 
 Before 1.0, incompatible API/grammar policy changes should use a new minor
@@ -228,7 +249,67 @@ or CPU quotas: low-level `string::encode`, `string::decode`, and
 `value_parser::parse_value` work on individual caller-owned values without a
 byte budget. Caller-created deeply recursive AxsValue operations and custom
 Serde implementations remain the caller's responsibility. The canonical
-repository URL remains an unresolved owner decision in this checkout.
+repository is <https://github.com/olehvitriachenko/axs>.
+
+## Local checks
+
+Hosted CI is not required to verify a change. From the repository root:
+
+```sh
+scripts/check.sh
+```
+
+The script runs `cargo fmt --check`, Clippy with `-D warnings`, the locked
+workspace tests and doctests, and `cargo package`. It then builds and tests the
+TypeScript SDK (WebAssembly build, type-check, runtime tests, and a tarball
+install test), and finally runs `npm ci` and the TypeScript build for the VS
+Code extension. `--skip-sdk` and `--skip-extension` omit those parts; the SDK
+needs `rustup target add wasm32-unknown-unknown` and the `wasm-bindgen` CLI
+version locked in `Cargo.lock`. It stops at
+the first failing step and exits with that step's status. It needs a Rust
+toolchain with rustfmt and Clippy, plus Node.js and npm for the extension.
+
+## TypeScript and JavaScript
+
+`packages/axs` contains the `@axs-lang/core` npm package. The current SDK
+checkout is 0.2.0; npm currently reports 0.1.0. The SDK runs this crate compiled
+to WebAssembly through the
+`crates/axs-wasm` bindings, so there's no second parser and no Rust requirement
+for its users:
+
+```ts
+import { parse, stringify } from "@axs-lang/core";
+
+const config = parse("server:\n  port: 3000\n");
+stringify({ id: 9223372036854775807n }); // "id: 9223372036854775807\n"
+```
+
+Integers outside JavaScript's safe range are returned as `bigint`, and unsafe
+integer `number`s are rejected instead of rounded. Node.js loads the module
+synchronously; browsers call `await init()` first. See
+[packages/axs/README.md](packages/axs/README.md) for the numeric policy,
+errors, tested environments, and build instructions.
+
+## VS Code extension
+
+`editors/vscode` contains the **AXS Language** extension (0.1.0, not yet
+published). It provides syntax highlighting, Smart Enter, live diagnostics
+(400 ms debounce), and Format Document. Validation and formatting run this
+crate compiled to WebAssembly and bundled into the extension, so users need
+neither Rust nor the `axs` CLI. Formatting output is identical to `axs fmt`.
+See [editors/vscode/README.md](editors/vscode/README.md) and
+[editors/vscode/RELEASE_READINESS.md](editors/vscode/RELEASE_READINESS.md).
+
+To build and try it, build the SDK first (it supplies the WebAssembly core),
+then open the repository in VS Code and run the **Run AXS Extension** launch
+configuration:
+
+```sh
+npm --prefix packages/axs ci && npm --prefix packages/axs run build
+npm --prefix editors/vscode ci
+npm --prefix editors/vscode test
+npm --prefix editors/vscode run package   # produces axs-language-0.1.0.vsix
+```
 
 ## License
 

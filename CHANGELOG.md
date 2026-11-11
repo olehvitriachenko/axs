@@ -5,9 +5,48 @@
 No published release history was verified. The manifest is still 0.1.0; earlier
 development milestone labels are not asserted to be crates.io releases.
 
-### Breaking grammar change
+### Changed: SDK and VS Code extension follow Grammar v3
 
-- Grammar v2 requires `key:` for all named nonempty object/array blocks. The
+- `@axs-lang/core` (checkout 0.2.0) adds `query(document, text)` over the new
+  `query`/`querySource` WebAssembly exports, the `LengthMismatch`,
+  `InvalidCollection`, and `InvalidQuery` error kinds (AXS010-AXS012), and keeps
+  key order in `parse`/`stringify`; keys that are not bare keys are written
+  quoted instead of rejected.
+- The VS Code extension highlights tables, lengths, inline arrays/objects, and
+  text blocks, and Smart Enter and auto-indent handle them. Verified in a real
+  VS Code with the installed-VSIX smoke test (15/15 steps).
+
+### Added: queries
+
+- `axs::query` and `axs query [--from-json] [--json] QUERY FILE` select,
+  filter, and project data: `users[age > 20]{name}`, `users[-1]`,
+  `issues[state == open and labels.name ~ bug].number` (spec/QUERY.md).
+  `ErrorKind` adds `InvalidQuery` (AXS012); errors name available fields.
+
+### Breaking grammar change: Grammar v3
+
+- Grammar v3 replaces v2 without a migration mode (spec/AXS.md; v2 kept as
+  spec/AXS-v2.md). Fields are `key: value`; `key = value` is rejected.
+- New: inline arrays `[a, b]`, `|` text blocks, tables `key{a, b}:` with
+  `- x, y` rows, optional checked lengths `key[N]`, quoted keys, `.` in bare
+  keys, and exponent floats.
+- Key order is preserved: `AxsObject` (`IndexMap`) replaces `HashMap`, and the
+  serializer no longer sorts. `axs fmt --sort-keys` and `value::sort_keys`
+  sort explicitly. JSON conversion keeps key order.
+- The serializer picks tables, inline arrays, or blocks, writes lengths, and
+  uses text blocks for multiline strings. Non-bare keys are quoted instead of
+  rejected.
+- `TokenKind` drops `Equals` and adds `Length`, `Columns`, `Items`, `Text`.
+  `ErrorKind` adds `LengthMismatch` (AXS010) and `InvalidCollection` (AXS011).
+- Normative conformance fixtures in `tests/conformance/`.
+- Token-driven canonical form: commas without spaces, table rows without a `-`
+  prefix (a dashed row is now an error), and inline objects `{a: 1,b: x}` for
+  objects of up to four primitive fields. Measured in `bench/tokens/`: 14.6%
+  fewer tokens than minified JSON overall (TOON 4.4.0: 14.3%).
+
+### Breaking grammar change: Grammar v2
+
+- Grammar v2 required `key:` for all named nonempty object/array blocks. The
   parser rejects legacy bare keys and mixed old/new block syntax; no legacy
   grammar mode is provided. `key = value`, empty `[]`/`{}` assignments, primitive
   typing, escaping, and resource limits are preserved.
@@ -22,6 +61,47 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Added
 
+- Smart Enter inserts `- ` after new named blocks and nested collection
+  openers, while mirroring existing object/list children. The new
+  `axs.smartEnter.defaultCollection` setting allows an object preference.
+  Invalid odd indentation falls back to normal editor behavior.
+
+- `@axs-lang/core` 0.2.0 (not published; 0.1.0 on npm is unchanged): `check`
+  and `format`, backed by new `check`/`format` WebAssembly bindings. `format`
+  serializes the Rust tree directly, so it matches `axs fmt` byte-for-byte,
+  which `stringify(parse(text))` cannot do because `1.0` would become `1`.
+  It is tested against the CLI.
+- VS Code extension prepared for its first Marketplace release (0.1.0, not
+  published). Validation and formatting now run the bundled WebAssembly core,
+  so Rust and the `axs` CLI are no longer needed. The extension is bundled with
+  esbuild, packaged with an allow-listed VSIX, and covered by unit, grammar,
+  and WebAssembly runtime tests plus an installed-VSIX smoke test in VS Code.
+  See editors/vscode/RELEASE_READINESS.md.
+- TypeScript/JavaScript SDK (`packages/axs`, npm name
+  `@axs-lang/core`): `parse`, `stringify`, `init`,
+  and a structured `AxsError`, backed by the Rust core compiled to WebAssembly.
+  The Node.js build is CommonJS with synchronous loading and works through both
+  `require` and `import`. A browser ESM build needs `await init()`. Integers
+  outside ±(2^53 − 1) map to `bigint`, unsafe integer numbers and out-of-range
+  bigints are rejected, and `-0` and float bits are preserved. Includes Node.js
+  and NestJS-style examples, a browser example, runtime tests, and a tarball
+  install test.
+- `crates/axs-wasm` (workspace member, `publish = false`): wasm-bindgen bindings
+  that exchange a versioned binary payload with the SDK, so no JSON
+  intermediate is used and Rust never calls back into user JavaScript.
+- `axs::serializer::stringify_typed` is now public: it is `stringify` with a
+  structured `AxsError` instead of a string. This is additive, and `stringify`
+  is unchanged.
+- VS Code extension (`editors/vscode`, unpublished): TextMate syntax
+  highlighting, Smart Enter list continuation, live CLI diagnostics with a
+  400 ms debounce and stale-result protection, and Format Document via
+  `axs fmt` on a temporary copy.
+- `scripts/check.sh`: local verification (fmt, Clippy, tests, doctests, crate
+  packaging, extension `npm ci` and TypeScript build) that does not depend on
+  hosted CI.
+- Release metadata: Cargo `repository` URL
+  (https://github.com/olehvitriachenko/axs), `command-line-utilities` category,
+  and RELEASE_CHECKLIST.md for the proposed 0.2.0 prerelease.
 - Replace the demonstration executable with a Clap-based `axs` CLI: `check`,
   `fmt`, `fmt --check`, `to-json`, `from-json`, help, and version support.
   Library signatures, Grammar v2, primitives, and Serde contracts are unchanged.
@@ -50,6 +130,19 @@ development milestone labels are not asserted to be crates.io releases.
 
 ### Fixed
 
+- VS Code Smart Enter edits were silently dropped in the real editor:
+  `registerTextEditorCommand` ran the handler inside its own edit transaction.
+  Smart Enter also inserted `- ` after every `key:` header, even in objects.
+  It now mirrors the block's existing children, and an empty `- ` item ends
+  the list. Highlighting no longer colors `true` or numbers inside unquoted
+  strings.
+- VS Code extension: the CLI was only found at a repository-relative path,
+  which does not exist in an installed extension and lacked `.exe` on Windows;
+  it now falls back to `axs` on `PATH`, and `axs.cliPath` is a declared setting.
+  A missing CLI is reported once instead of only in the developer console.
+  Smart Enter defers to the built-in Enter with multiple cursors. Type
+  definitions are pinned to the declared VS Code 1.90 / Node 20 baseline, and
+  `.vscodeignore` keeps sources, maps, and `node_modules` out of a VSIX.
 - Excessive nesting, numeric overflow fallback, lone-quote decoding panic, and
   ambiguous array-string serialization during the preceding core milestones.
 - Release-audit diagnostics: long-line/message amplification and raw terminal
@@ -65,8 +158,8 @@ development milestone labels are not asserted to be crates.io releases.
 - Numeric buffered Serde deserialization is intentionally unsupported; nullable
   Some values are rejected to avoid information loss. See SERDE_STATUS.md.
 - Crate version was not bumped, no release tag was created, and nothing was
-  published. Apache-2.0 licensing is resolved; canonical repository metadata
-  still requires the owner's decision.
+  published. Apache-2.0 licensing is resolved, and the repository URL is set
+  from the configured Git remote.
 
 ## Proposed next versions
 

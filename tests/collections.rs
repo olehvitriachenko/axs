@@ -10,26 +10,26 @@ fn roundtrip(source: &str) {
 
 #[test]
 fn empty_array() {
-    let data = parse("tags = []").unwrap();
+    let data = parse("tags: []").unwrap();
     assert_eq!(data["tags"], AxsValue::Array(vec![]));
-    roundtrip("tags = []");
+    roundtrip("tags: []");
 }
 
 #[test]
 fn empty_object() {
-    let data = parse("settings = {}").unwrap();
+    let data = parse("settings: {}").unwrap();
     assert_eq!(data["settings"], AxsValue::Object(Default::default()));
-    roundtrip("settings = {}");
+    roundtrip("settings: {}");
 }
 
 #[test]
 fn array_of_objects() {
     roundtrip(
         r#"users:
-  - name = Oleh
-    age = 22
-  - name = Alex
-    age = 25
+  - name: Oleh
+    age: 22
+  - name: Alex
+    age: 25
 "#,
     );
 }
@@ -52,11 +52,11 @@ fn nested_arrays() {
 fn nested_objects_in_arrays() {
     roundtrip(
         r#"users:
-  - name = Oleh
+  - name: Oleh
     skills:
       - Rust
       - TypeScript
-  - name = Alex
+  - name: Alex
     skills:
       - Go
 "#,
@@ -76,5 +76,5 @@ fn empty_collections_inside_array() {
 
 #[test]
 fn rejects_inconsistent_indentation() {
-    assert!(parse("user:\n    name = Oleh").is_err());
+    assert!(parse("user:\n    name: Oleh").is_err());
 }

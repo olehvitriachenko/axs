@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -9,7 +8,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::value::RawValue;
 use serde_json::{Number, Value};
 
-type Object = HashMap<String, AxsValue>;
+type Object = axs::AxsObject;
 
 pub(super) fn from_json(source: &str) -> Result<Object, AxsError> {
     // serde_json validates borrowed fragments without recursively allocating a
@@ -63,7 +62,7 @@ fn convert(raw: &RawValue, depth: usize, nodes: &mut usize) -> Result<AxsValue, 
         Some(b'{') => {
             let RawObject(entries) = fragment(source)?;
             check_depth(depth, !entries.is_empty())?;
-            let mut object = HashMap::new();
+            let mut object = Object::new();
             for (key, raw) in entries {
                 if object.contains_key(&key) {
                     return Err(AxsError::new(
@@ -209,7 +208,11 @@ impl<'de> Deserialize<'de> for RawArray<'de> {
 }
 
 pub(super) fn to_json(object: Object) -> Result<Vec<u8>, AxsError> {
-    let value = json_value(AxsValue::Object(object))?;
+    value_to_json(AxsValue::Object(object))
+}
+
+pub(super) fn value_to_json(value: AxsValue) -> Result<Vec<u8>, AxsError> {
+    let value = json_value(value)?;
     let mut output = BoundedOutput(Vec::new());
     serde_json::to_writer_pretty(&mut output, &value).map_err(|error| {
         AxsError::new(

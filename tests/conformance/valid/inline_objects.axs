@@ -1,0 +1,5 @@
+user: {login: ivan,id: 10003}
+spaced: { a: 1 , "b c": "x, y" }
+limits: {cpu: 250m,memory: 512Mi}
+items:
+  - {a: 1,b: "[x]"}

@@ -96,7 +96,7 @@ fn argument_errors_have_exit_code_two() {
 #[test]
 fn check_validates_v2_without_modifying_or_printing_status() {
     let fixture = Fixture::new();
-    let source = "# comment\nuser:\n  name = Олег\nskills:\n  - UI:\n      - MUI\n";
+    let source = "# comment\nuser:\n  name: Олег\nskills:\n  - UI:\n      - MUI\n";
     let path = fixture.file("Профіль 🚀.axs", source);
     quiet_success(&fixture.run("check", &path, false));
     assert_eq!(fs::read_to_string(path).unwrap(), source);
@@ -107,10 +107,10 @@ fn check_validates_v2_without_modifying_or_printing_status() {
 fn invalid_documents_render_structured_diagnostics_on_stderr() {
     let fixture = Fixture::new();
     for source in [
-        "user\n  age = 22",
-        "x = \"bad\\q\"",
-        "name = one\nname = two",
-        "x = 9223372036854775808",
+        "user\n  age: 22",
+        "x: \"bad\\q\"",
+        "name: one\nname: two",
+        "x: 9223372036854775808",
     ] {
         let path = fixture.file("invalid.axs", source);
         let output = fixture.run("check", &path, false);
@@ -143,7 +143,7 @@ fn io_failures_use_exit_code_three() {
 #[test]
 fn format_check_detects_differences_without_writing() {
     let fixture = Fixture::new();
-    let path = fixture.file("input.axs", "# removed\nz=1\na = 2\n");
+    let path = fixture.file("input.axs", "# removed\nz: 1\na: 2\n");
     let before = fs::read(&path).unwrap();
     let output = fixture.run("fmt", &path, true);
     status(&output, 1);
@@ -151,14 +151,14 @@ fn format_check_detects_differences_without_writing() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("not canonically formatted"));
     assert_eq!(fs::read(&path).unwrap(), before);
     assert_eq!(fixture.entries(), 1);
-    fs::write(&path, "a = 2\nz = 1\n").unwrap();
+    fs::write(&path, "a: 2\nz: 1\n").unwrap();
     quiet_success(&fixture.run("fmt", &path, true));
 }
 
 #[test]
 fn formatting_replaces_only_after_parse_and_preserves_data() {
     let fixture = Fixture::new();
-    let source = "# lost\nz=1\nusers:\n  - name = Oleh\n    skills:\n      - \"UI:\"\n";
+    let source = "# lost\nz: 1\nusers:\n  - name: Oleh\n    skills:\n      - \"UI:\"\n";
     let path = fixture.file("input.axs", source);
     let original = axs::parse(source).unwrap();
     quiet_success(&fixture.run("fmt", &path, false));
@@ -172,7 +172,7 @@ fn formatting_replaces_only_after_parse_and_preserves_data() {
 #[test]
 fn invalid_formatting_never_changes_input_or_leaves_temporary_files() {
     let fixture = Fixture::new();
-    for source in ["key:\n  bad\n", "x = \"open", "x = 1\nx = 2"] {
+    for source in ["key:\n  bad\n", "x: \"open", "x: 1\nx: 2"] {
         let path = fixture.file("input.axs", source);
         for check in [false, true] {
             let output = fixture.run("fmt", &path, check);
@@ -186,14 +186,14 @@ fn invalid_formatting_never_changes_input_or_leaves_temporary_files() {
 #[test]
 fn readonly_input_is_preserved_on_failed_replacement() {
     let fixture = Fixture::new();
-    let path = fixture.file("input.axs", "z=1\na=2\n");
+    let path = fixture.file("input.axs", "z:   1\na: 2\n");
     let original_permissions = fs::metadata(&path).unwrap().permissions();
     let mut readonly = original_permissions.clone();
     readonly.set_readonly(true);
     fs::set_permissions(&path, readonly).unwrap();
     let output = fixture.run("fmt", &path, false);
     status(&output, 3);
-    assert_eq!(fs::read_to_string(&path).unwrap(), "z=1\na=2\n");
+    assert_eq!(fs::read_to_string(&path).unwrap(), "z:   1\na: 2\n");
     assert_eq!(fixture.entries(), 1);
     fs::set_permissions(&path, original_permissions).unwrap();
 }
@@ -203,7 +203,7 @@ fn readonly_input_is_preserved_on_failed_replacement() {
 fn unix_permissions_are_preserved() {
     use std::os::unix::fs::PermissionsExt;
     let fixture = Fixture::new();
-    let path = fixture.file("input.axs", "z=1\na=2\n");
+    let path = fixture.file("input.axs", "z:   1\na: 2\n");
     fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
     quiet_success(&fixture.run("fmt", &path, false));
     assert_eq!(
@@ -217,7 +217,7 @@ fn unix_permissions_are_preserved() {
 fn symlinks_are_readable_but_in_place_formatting_refuses_them() {
     use std::os::unix::fs::symlink;
     let fixture = Fixture::new();
-    let target = fixture.file("target.axs", "z=1\na=2\n");
+    let target = fixture.file("target.axs", "z:   1\na: 2\n");
     let link = fixture.0.path().join("link.axs");
     symlink(&target, &link).unwrap();
     quiet_success(&fixture.run("check", &link, false));
@@ -226,7 +226,7 @@ fn symlinks_are_readable_but_in_place_formatting_refuses_them() {
     status(&output, 3);
     assert!(String::from_utf8_lossy(&output.stderr).contains("symlinks"));
     assert!(fs::symlink_metadata(link).unwrap().file_type().is_symlink());
-    assert_eq!(fs::read_to_string(target).unwrap(), "z=1\na=2\n");
+    assert_eq!(fs::read_to_string(target).unwrap(), "z:   1\na: 2\n");
     assert_eq!(fixture.entries(), 2);
 }
 
@@ -234,7 +234,7 @@ fn symlinks_are_readable_but_in_place_formatting_refuses_them() {
 fn preexisting_temporary_looking_file_is_never_overwritten() {
     let fixture = Fixture::new();
     let sentinel = fixture.file(".axs-existing", "sentinel");
-    let path = fixture.file("input.axs", "x=1\n");
+    let path = fixture.file("input.axs", "x: 1\n");
     quiet_success(&fixture.run("fmt", &path, false));
     assert_eq!(fs::read_to_string(sentinel).unwrap(), "sentinel");
     assert_eq!(fixture.entries(), 2);
@@ -290,7 +290,7 @@ fn empty_documents_and_json_objects_are_supported() {
 #[test]
 fn axs_to_json_preserves_nested_supported_values_and_i64_digits() {
     let fixture = Fixture::new();
-    let source = "max = 9223372036854775807\nmin = -9223372036854775808\nuser:\n  name = \"UI: = - 🚀\"\n  active = true\n  absent = null\n  empty = {}\nvalues:\n  - 0.5\n  - []\n";
+    let source = "max: 9223372036854775807\nmin: -9223372036854775808\nuser:\n  name: \"UI: = - 🚀\"\n  active: true\n  absent: null\n  empty: {}\nvalues:\n  - 0.5\n  - []\n";
     let path = fixture.file("input.axs", source);
     let output = fixture.run("to-json", &path, false);
     status(&output, 0);
@@ -306,16 +306,16 @@ fn axs_to_json_preserves_nested_supported_values_and_i64_digits() {
 }
 
 #[test]
-fn json_to_axs_is_canonical_v2_and_keeps_input_unchanged() {
+fn json_to_axs_is_canonical_v3_and_keeps_input_unchanged() {
     let fixture = Fixture::new();
-    let source = r#"{"z":null,"user":{"name":"Олег","skills":["UI:","name = value"]},"empty":{}}"#;
+    let source = r#"{"z":null,"user":{"name":"Олег","skills":["UI:","name: value"]},"empty":{}}"#;
     let path = fixture.file("input.json", source);
     let output = fixture.run("from-json", &path, false);
     status(&output, 0);
     assert!(output.stderr.is_empty());
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "empty = {}\nuser:\n  name = Олег\n  skills:\n    - \"UI:\"\n    - \"name = value\"\nz = null\n"
+        "z: null\nuser:\n  name: Олег\n  skills[2]: [UI:,name: value]\nempty: {}\n"
     );
     assert_eq!(fs::read_to_string(path).unwrap(), source);
 }
@@ -343,8 +343,6 @@ fn malformed_json_and_invalid_keys_produce_no_partial_stdout() {
         "{\"x\":NaN}",
         "{\"x\":01}",
         "{\"x\":\"\\uD800\"}",
-        "{\"bad key\":1}",
-        "{\"ключ\":null}",
     ] {
         let path = fixture.file("bad.json", source);
         let output = fixture.run("from-json", &path, false);
@@ -352,6 +350,18 @@ fn malformed_json_and_invalid_keys_produce_no_partial_stdout() {
         assert!(output.stdout.is_empty());
         assert!(String::from_utf8_lossy(&output.stderr).contains("AXS"));
     }
+}
+
+#[test]
+fn json_keys_that_are_not_bare_keys_are_quoted() {
+    let fixture = Fixture::new();
+    let path = fixture.file("keys.json", r#"{"bad key":1,"ключ":null,"@id":"x"}"#);
+    let output = fixture.run("from-json", &path, false);
+    status(&output, 0);
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "\"bad key\": 1\n\"ключ\": null\n\"@id\": x\n"
+    );
 }
 
 #[test]
@@ -474,7 +484,7 @@ fn json_depth_and_axs_depth_share_the_same_boundary() {
 #[test]
 fn json_node_and_axs_token_budgets_are_enforced() {
     let fixture = Fixture::new();
-    for size in [MAX_TOKENS / 3, MAX_TOKENS + 1] {
+    for size in [MAX_TOKENS, MAX_TOKENS + 1] {
         let source = format!("{{\"items\":[{}null]}}", "null,".repeat(size));
         let path = fixture.file("many.json", source);
         let output = fixture.run("from-json", &path, false);
@@ -498,7 +508,7 @@ fn conversion_output_expansion_is_bounded_before_stdout() {
     // JSON escapes controls more heavily than AXS's compact \\0 encoding.
     let axs = fixture.file(
         "large.axs",
-        format!("x = \"{}\"\n", "\\0".repeat(MAX_INPUT_BYTES / 3)),
+        format!("x: \"{}\"\n", "\\0".repeat(MAX_INPUT_BYTES / 3)),
     );
     let output = fixture.run("to-json", &axs, false);
     status(&output, 1);
@@ -512,7 +522,7 @@ fn broken_stdout_pipe_is_an_io_error_without_a_panic() {
     use std::os::unix::net::UnixStream;
     use std::process::Stdio;
     let fixture = Fixture::new();
-    let path = fixture.file("input.axs", "x = 1");
+    let path = fixture.file("input.axs", "x: 1");
     let (reader, writer) = UnixStream::pair().unwrap();
     drop(reader);
     let output = Command::new(env!("CARGO_BIN_EXE_axs"))
@@ -537,7 +547,7 @@ fn fixed_seed_json_roundtrips_preserve_float_bits_and_special_strings() {
         if !float.is_finite() {
             continue;
         }
-        let tree = std::collections::HashMap::from([
+        let tree = axs::AxsObject::from([
             ("number".into(), AxsValue::Float(float)),
             ("integer".into(), AxsValue::Integer(seed as i64)),
             (
@@ -572,7 +582,7 @@ fn reserved_numeric_and_escaped_json_strings_retain_their_types() {
         "1e2",
         "",
         "UI:",
-        "x = y",
+        "x: y",
         "-",
         "# literal",
         "🚀\n\t\0\"\\",
@@ -593,7 +603,8 @@ fn reserved_numeric_and_escaped_json_strings_retain_their_types() {
 #[test]
 fn formatting_output_limit_failure_never_replaces_the_input() {
     let fixture = Fixture::new();
-    let source = format!("x=name={}\n", "x".repeat(MAX_INPUT_BYTES - 8));
+    // Canonical output adds a length to the inline array: `x[1]: [...]`.
+    let source = format!("x: [{}]\n", "x".repeat(MAX_INPUT_BYTES - 6));
     assert_eq!(source.len(), MAX_INPUT_BYTES);
     let path = fixture.file("large.axs", &source);
     let output = fixture.run("fmt", &path, false);
@@ -614,10 +625,10 @@ fn non_utf8_file_names_are_accepted_as_os_paths() {
         .0
         .path()
         .join(OsString::from_vec(b"name-\xff.axs".to_vec()));
-    fs::write(&path, "x=1\n").unwrap();
+    fs::write(&path, "x: 1\n").unwrap();
     quiet_success(&fixture.run("check", &path, false));
     quiet_success(&fixture.run("fmt", &path, false));
-    assert_eq!(fs::read_to_string(path).unwrap(), "x = 1\n");
+    assert_eq!(fs::read_to_string(path).unwrap(), "x: 1\n");
 }
 
 #[cfg(windows)]
@@ -625,7 +636,7 @@ fn non_utf8_file_names_are_accepted_as_os_paths() {
 fn windows_locked_target_is_preserved_after_failed_atomic_replacement() {
     use std::os::windows::fs::OpenOptionsExt;
     let fixture = Fixture::new();
-    let path = fixture.file("locked.axs", "x=1\n");
+    let path = fixture.file("locked.axs", "x: 1\n");
     // Allow readers but deny deletion/replacement while this handle is open.
     let locked = fs::OpenOptions::new()
         .read(true)
@@ -634,7 +645,97 @@ fn windows_locked_target_is_preserved_after_failed_atomic_replacement() {
         .unwrap();
     let output = fixture.run("fmt", &path, false);
     status(&output, 3);
-    assert_eq!(fs::read_to_string(&path).unwrap(), "x=1\n");
+    assert_eq!(fs::read_to_string(&path).unwrap(), "x: 1\n");
     assert_eq!(fixture.entries(), 1);
     drop(locked);
+}
+
+#[test]
+fn format_keeps_key_order_unless_sort_keys_is_requested() {
+    let fixture = Fixture::new();
+    let path = fixture.file("input.axs", "z: 1\nuser:\n  y: 2\n  b[1]: [3]\n");
+    quiet_success(&fixture.run("fmt", &path, true));
+    let output = Command::new(env!("CARGO_BIN_EXE_axs"))
+        .args(["fmt", "--sort-keys", "--check", "--"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    status(&output, 1);
+    let output = Command::new(env!("CARGO_BIN_EXE_axs"))
+        .args(["fmt", "--sort-keys", "--"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    status(&output, 0);
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "user:\n  b[1]: [3]\n  y: 2\nz: 1\n"
+    );
+}
+
+#[test]
+fn query_selects_filters_and_projects() {
+    let fixture = Fixture::new();
+    let path = fixture.file(
+        "data.axs",
+        "users[3]{name,age}:\n  Oleh,22\n  Alex,25\n  Maria,31\n",
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_axs"))
+        .args(["query", "users"])
+        .output()
+        .unwrap();
+    status(&output, 2);
+    let run = |flags: &[&str], text: &str| {
+        Command::new(env!("CARGO_BIN_EXE_axs"))
+            .arg("query")
+            .args(flags)
+            .arg("--")
+            .arg(text)
+            .arg(&path)
+            .output()
+            .unwrap()
+    };
+    let output = run(&[], "users[age > 22]{name}");
+    status(&output, 0);
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "result[2]{name}:\n  Alex\n  Maria\n"
+    );
+    let output = run(&[], "users[0]");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "name: Oleh\nage: 22\n"
+    );
+    let output = run(&["--json"], "users.age");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "[\n  22,\n  25,\n  31\n]\n"
+    );
+    let output = run(&[], "users[age = 1]");
+    status(&output, 1);
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("AXS012") && stderr.contains("query:1:11"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn query_reads_json_input() {
+    let fixture = Fixture::new();
+    let path = fixture.file(
+        "data.json",
+        r#"{"items":[{"id":1,"ok":true},{"id":2,"ok":false}]}"#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_axs"))
+        .args(["query", "--from-json", "--", "items[ok == true].id"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    status(&output, 0);
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "result[1]: [1]\n"
+    );
 }

@@ -1,0 +1,18 @@
+[package]
+name = "axs-wasm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "WebAssembly bindings that expose the AXS Rust core to JavaScript"
+license = "Apache-2.0"
+repository = "https://github.com/olehvitriachenko/axs"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+axs = { path = "../.." }
+# The wasm-bindgen CLI must match this exact version; packages/axs/scripts/build.mjs checks it.
+wasm-bindgen = "=0.2.129"
+js-sys = "=0.3.106"

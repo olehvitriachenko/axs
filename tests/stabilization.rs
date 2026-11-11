@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use axs::AxsObject;
 
 use axs::lexer::{MAX_INPUT_BYTES, MAX_NESTING_DEPTH, MAX_TOKENS};
 use axs::{AxsError, AxsValue, ErrorKind, SourceSpan, parse, stringify, tokenize};
 
 fn roundtrip(value: AxsValue) {
-    let original = HashMap::from([("value".into(), value)]);
+    let original = AxsObject::from([("value".into(), value)]);
     let encoded = stringify(&original).unwrap();
     let restored = parse(&encoded).unwrap();
     assert_eq!(original, restored, "{encoded}");
@@ -34,11 +34,11 @@ fn assert_value_bits(left: &AxsValue, right: &AxsValue) {
 #[test]
 fn quotes_array_strings_that_resemble_inline_objects() {
     for text in [
-        "name = value",
-        "key=",
-        "_key = 1",
-        "key-name = {}",
-        "name = \"a=b\"",
+        "name: value",
+        "key: ",
+        "_key: 1",
+        "key-name: {}",
+        "name: \"a: b\"",
     ] {
         roundtrip(AxsValue::Array(vec![AxsValue::String(text.into())]));
     }
@@ -46,47 +46,46 @@ fn quotes_array_strings_that_resemble_inline_objects() {
 
 #[test]
 fn preserves_equals_in_quoted_and_unquoted_values() {
-    let values = parse("scalar = a=b=c\nitems:\n  - \"name = value\"\n  - bad key = text\n  - name = \"a=b\"\n    extra = c=d").unwrap();
+    let values = parse("scalar: a=b=c\nitems:\n  - \"name: value\"\n  - bad key = text\n  - name: \"a: b\"\n    extra: c=d").unwrap();
     assert_eq!(values["scalar"], AxsValue::String("a=b=c".into()));
     let AxsValue::Array(items) = &values["items"] else {
         panic!("Expected array")
     };
-    assert_eq!(items[0], AxsValue::String("name = value".into()));
+    assert_eq!(items[0], AxsValue::String("name: value".into()));
     assert_eq!(items[1], AxsValue::String("bad key = text".into()));
     let AxsValue::Object(object) = &items[2] else {
         panic!("Expected object")
     };
-    assert_eq!(object["name"], AxsValue::String("a=b".into()));
+    assert_eq!(object["name"], AxsValue::String("a: b".into()));
     assert_eq!(object["extra"], AxsValue::String("c=d".into()));
     assert_eq!(parse(&stringify(&values).unwrap()).unwrap(), values);
 }
 
 #[test]
 fn comments_are_only_full_lines() {
-    let values = parse("# comment\nroot:\n      # ignored indentation\n\n  value = text # literal\n  items:\n    # comment\n    - # literal\n    - name = # literal\n      # comment\n      other = true # literal").unwrap();
+    let values = parse("# comment\nroot:\n      # ignored indentation\n\n  value: text # literal\n  items:\n    # comment\n    - # literal\n    - name: # literal\n      # comment\n      other: true # literal").unwrap();
     assert_eq!(parse(&stringify(&values).unwrap()).unwrap(), values);
     let AxsValue::Object(root) = &values["root"] else {
         panic!("Expected object")
     };
     assert_eq!(root["value"], AxsValue::String("text # literal".into()));
     assert_eq!(
-        parse("n = 22 # literal").unwrap()["n"],
+        parse("n: 22 # literal").unwrap()["n"],
         AxsValue::String("22 # literal".into())
     );
     assert_eq!(
-        parse("n = \"ok\" # suffix").unwrap_err().kind,
+        parse("n: \"ok\" # suffix").unwrap_err().kind,
         ErrorKind::InvalidString
     );
 }
 
 #[test]
 fn whitespace_and_crlf_are_consistent() {
-    let source =
-        "user:\r\n  name  =   Oleh  \r\n  items:\r\n    -    Rust  \r\n    - \"  Kyiv  \"\r\n";
+    let source = "user:\r\n  name: Oleh  \r\n  items:\r\n    -    Rust  \r\n    - \"  Kyiv  \"\r\n";
     let values = parse(source).unwrap();
     assert_eq!(parse(&stringify(&values).unwrap()).unwrap(), values);
     assert_eq!(
-        parse("name = \u{2003}Oleh\u{2003}").unwrap()["name"],
+        parse("name: \u{2003}Oleh\u{2003}").unwrap()["name"],
         AxsValue::String("Oleh".into())
     );
     let error = parse("  \u{2003}name = Oleh").unwrap_err();
@@ -118,10 +117,10 @@ fn rejects_malformed_strings_without_panicking() {
     ] {
         assert!(axs::string::decode(raw).is_err(), "{raw:?}");
         assert!(axs::value_parser::parse_value(raw).is_err(), "{raw:?}");
-        let error = parse(&format!("value = {raw}")).unwrap_err();
+        let error = parse(&format!("value: {raw}")).unwrap_err();
         assert_eq!(error.kind, ErrorKind::InvalidString, "{raw:?}");
         let span = error.span.unwrap();
-        assert_eq!(span.column, 9);
+        assert_eq!(span.column, 8);
         assert_eq!(span.length, raw.chars().count());
     }
 }
@@ -148,42 +147,42 @@ fn unicode_and_control_strings_roundtrip() {
         );
     }
     assert_eq!(
-        parse("x = \"\\u{1F680}\\u{000041}\"").unwrap()["x"],
+        parse("x: \"\\u{1F680}\\u{000041}\"").unwrap()["x"],
         AxsValue::String("🚀A".into())
     );
-    assert_eq!(parse("x = a\0b").unwrap_err().kind, ErrorKind::InvalidValue);
+    assert_eq!(parse("x: a\0b").unwrap_err().kind, ErrorKind::InvalidValue);
 }
 
 #[test]
 fn rejects_invalid_block_structure_and_dedentation() {
     for source in [
-        "  x = 1",
-        "x = 1\n  y = 2",
-        "x:\n    y = 2",
-        "x:\n  y:\n    z = 1\n   a = 2",
+        "  x: 1",
+        "x: 1\n  y: 2",
+        "x:\n    y: 2",
+        "x:\n  y:\n    z: 1\n   a: 2",
         "x:\n  - one\n    - two",
-        "x:\n  - one\n  y = 2",
-        "x:\n  a = 1\n  - two",
-        "x:\n  -\ny = 2",
-        "x:\n  - name = one\n      age = 22",
-        "x:\n  - name = one\n    - two",
+        "x:\n  - one\n  y: 2",
+        "x:\n  a: 1\n  - two",
+        "x:\n  -\ny: 2",
+        "x:\n  - name: one\n      age: 22",
+        "x:\n  - name: one\n    - two",
     ] {
         assert!(parse(source).is_err(), "{source}");
     }
-    let error = parse("x = 1\n  y = 2").unwrap_err();
+    let error = parse("x: 1\n  y: 2").unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidIndentation);
     assert_eq!(error.span.unwrap().line, 2);
-    let values = parse("x:\n  a:\n    b = 1\ny = 2").unwrap();
+    let values = parse("x:\n  a:\n    b: 1\ny: 2").unwrap();
     assert_eq!(values["y"], AxsValue::Integer(2));
 }
 
 #[test]
 fn empty_document_and_collections_roundtrip() {
     assert!(parse("# comment\n\n  # ignored").unwrap().is_empty());
-    assert_eq!(stringify(&HashMap::new()).unwrap(), "");
+    assert_eq!(stringify(&AxsObject::new()).unwrap(), "");
     roundtrip(AxsValue::Array(vec![
         AxsValue::Array(vec![]),
-        AxsValue::Object(HashMap::new()),
+        AxsValue::Object(AxsObject::new()),
         AxsValue::Null,
         AxsValue::Boolean(false),
     ]));
@@ -192,24 +191,27 @@ fn empty_document_and_collections_roundtrip() {
 #[test]
 fn numeric_grammar_does_not_expand() {
     for text in [
-        "1e10", "1.0e-10", "NaN", "Infinity", "inf", "+1", ".5", "1.", "00", "-01", "01.5", "--1",
-        "1_000", "１２", "0x10",
+        "NaN", "Infinity", "inf", "+1", ".5", "1.", "00", "-01", "01.5", "--1", "1_000", "１２",
+        "0x10",
     ] {
         assert_eq!(
-            parse(&format!("n = {text}")).unwrap()["n"],
+            parse(&format!("n: {text}")).unwrap()["n"],
             AxsValue::String(text.into())
         );
         roundtrip(AxsValue::String(text.into()));
     }
+    // Exponents are float syntax in Grammar v3.
+    assert_eq!(parse("n: 1e10").unwrap()["n"], AxsValue::Float(1e10));
+    assert_eq!(parse("n: 1.0e-10").unwrap()["n"], AxsValue::Float(1e-10));
     for text in ["0", "-0", "1", "-1"] {
         assert!(matches!(
-            parse(&format!("n = {text}")).unwrap()["n"],
+            parse(&format!("n: {text}")).unwrap()["n"],
             AxsValue::Integer(_)
         ));
     }
     for text in ["0.0", "-0.0", "1.5", "-1.5"] {
         assert!(matches!(
-            parse(&format!("n = {text}")).unwrap()["n"],
+            parse(&format!("n: {text}")).unwrap()["n"],
             AxsValue::Float(_)
         ));
     }
@@ -254,12 +256,12 @@ fn finite_float_extremes_and_negative_zero_roundtrip() {
     ] {
         roundtrip(AxsValue::Float(number));
     }
-    let AxsValue::Float(zero) = parse("n = -0.0").unwrap()["n"] else {
+    let AxsValue::Float(zero) = parse("n: -0.0").unwrap()["n"] else {
         panic!("Expected float")
     };
     assert_eq!(zero.to_bits(), (-0.0f64).to_bits());
     // Decimal-to-binary conversion uses f64 rounding, including underflow.
-    let source = format!("n = -0.{}1", "0".repeat(400));
+    let source = format!("n: -0.{}1", "0".repeat(400));
     let AxsValue::Float(zero) = parse(&source).unwrap()["n"] else {
         panic!("Expected float")
     };
@@ -269,15 +271,16 @@ fn finite_float_extremes_and_negative_zero_roundtrip() {
 #[test]
 fn rejects_unsupported_values_explicitly() {
     for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        let values = HashMap::from([("n".into(), AxsValue::Array(vec![AxsValue::Float(number)]))]);
+        let values =
+            AxsObject::from([("n".into(), AxsValue::Array(vec![AxsValue::Float(number)]))]);
         assert!(stringify(&values).unwrap_err().contains("Non-finite"));
     }
-    for key in ["", "1key", "bad key", "ключ", "a=b", "a\n"] {
-        assert!(
-            stringify(&HashMap::from([(key.into(), AxsValue::Null)]))
-                .unwrap_err()
-                .contains("Invalid AXS key")
-        );
+    // Keys that are not bare keys are written quoted and read back exactly.
+    for key in ["", "1key", "bad key", "ключ", "a: b", "a\n"] {
+        let object = AxsObject::from([(key.into(), AxsValue::Null)]);
+        let text = stringify(&object).unwrap();
+        assert!(text.starts_with('"'), "{text:?}");
+        assert_eq!(parse(&text).unwrap(), object);
     }
 }
 
@@ -307,12 +310,12 @@ fn nested_arrays_obey_the_same_depth_limit() {
 
 #[test]
 fn inline_objects_count_their_implicit_depth() {
-    let mut source = nested_source(MAX_NESTING_DEPTH - 1, "- key = 1\n");
+    let mut source = nested_source(MAX_NESTING_DEPTH - 1, "- key: 1\n");
     source.push_str(&"  ".repeat(MAX_NESTING_DEPTH));
-    source.push_str("other = 2\n");
+    source.push_str("other: 2\n");
     let values = parse(&source).unwrap();
     assert_eq!(parse(&stringify(&values).unwrap()).unwrap(), values);
-    let error = parse(&nested_source(MAX_NESTING_DEPTH, "- key = 1")).unwrap_err();
+    let error = parse(&nested_source(MAX_NESTING_DEPTH, "- key: 1")).unwrap_err();
     assert_eq!(error.kind, ErrorKind::InvalidIndentation);
     assert!(error.message.contains("Maximum nesting depth"));
     assert_eq!(error.span.unwrap().column, 259);
@@ -321,10 +324,10 @@ fn inline_objects_count_their_implicit_depth() {
 #[test]
 fn legacy_entry_point_uses_the_same_grammar_and_limits() {
     for source in [
-        "items:\n  - \"a=b\"\n  - bad key = text",
-        "n = 9223372036854775808",
-        "x = \"",
-        "items:\n  - key = one\n    key = two",
+        "items:\n  - \"a: b\"\n  - bad key = text",
+        "n: 9223372036854775808",
+        "x: \"",
+        "items:\n  - key: one\n    key: two",
     ] {
         assert_eq!(
             axs::parse_legacy(source),
@@ -347,13 +350,15 @@ fn serializer_rejects_excessive_depth_before_recursing_further() {
             value = if use_arrays {
                 AxsValue::Array(vec![value])
             } else {
-                AxsValue::Object(HashMap::from([("child".into(), value)]))
+                AxsValue::Object(AxsObject::from([("child".into(), value)]))
             };
         }
         roundtrip(value.clone());
-        let value = AxsValue::Array(vec![value]);
+        // The innermost array or object of primitives is written inline, one
+        // level up, so it takes two more levels to exceed the limit.
+        let value = AxsValue::Array(vec![AxsValue::Array(vec![value])]);
         assert!(
-            stringify(&HashMap::from([("value".into(), value)]))
+            stringify(&AxsObject::from([("value".into(), value)]))
                 .unwrap_err()
                 .contains("Maximum nesting depth")
         );
@@ -362,11 +367,11 @@ fn serializer_rejects_excessive_depth_before_recursing_further() {
 
 #[test]
 fn spans_cover_entire_invalid_values_and_unicode_columns() {
-    let error = parse("x = 🚀\nn = 9223372036854775808").unwrap_err();
-    assert_eq!(error.span.unwrap(), SourceSpan::new(2, 5, 19));
-    let error = parse("items:\n  - name = \"🚀\\q\"").unwrap_err();
-    assert_eq!(error.span.unwrap(), SourceSpan::new(2, 12, 5));
-    let error = parse("items:\n  - name = a\n    name = b").unwrap_err();
+    let error = parse("x: 🚀\nn: 9223372036854775808").unwrap_err();
+    assert_eq!(error.span.unwrap(), SourceSpan::new(2, 4, 19));
+    let error = parse("items:\n  - name: \"🚀\\q\"").unwrap_err();
+    assert_eq!(error.span.unwrap(), SourceSpan::new(2, 11, 5));
+    let error = parse("items:\n  - name: a\n    name: b").unwrap_err();
     assert_eq!(error.span.unwrap(), SourceSpan::new(3, 5, 4));
 }
 
@@ -388,10 +393,10 @@ fn input_and_output_byte_budgets_are_enforced() {
     let error = parse(&comment).unwrap_err();
     assert_eq!(error.kind, ErrorKind::SyntaxError);
     assert!(error.message.contains("input size"));
-    let value = HashMap::from([("v".into(), AxsValue::String("x".repeat(MAX_INPUT_BYTES)))]);
+    let value = AxsObject::from([("v".into(), AxsValue::String("x".repeat(MAX_INPUT_BYTES)))]);
     assert!(stringify(&value).unwrap_err().contains("output size"));
     // Escaping can exceed the output budget even when the original string fits.
-    let value = HashMap::from([(
+    let value = AxsObject::from([(
         "v".into(),
         AxsValue::String("\0".repeat(MAX_INPUT_BYTES / 2)),
     )]);
@@ -400,13 +405,13 @@ fn input_and_output_byte_budgets_are_enforced() {
 
 #[test]
 fn token_budgets_are_shared_by_reader_and_writer() {
-    assert!(tokenize(&"x = 0\n".repeat(MAX_TOKENS / 4 - 1)).is_ok());
-    let error = tokenize(&"x = 0\n".repeat(MAX_TOKENS / 4)).unwrap_err();
+    assert!(tokenize(&"x: 0\n".repeat(MAX_TOKENS / 4 - 1)).is_ok());
+    let error = tokenize(&"x: 0\n".repeat(MAX_TOKENS / 4)).unwrap_err();
     assert_eq!(error.kind, ErrorKind::SyntaxError);
     assert!(error.message.contains("token count"));
-    let value = HashMap::from([(
+    let value = AxsObject::from([(
         "v".into(),
-        AxsValue::Array(vec![AxsValue::Null; MAX_TOKENS / 2]),
+        AxsValue::Array(vec![AxsValue::Null; MAX_TOKENS]),
     )]);
     assert!(stringify(&value).unwrap_err().contains("token count"));
 }

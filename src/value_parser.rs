@@ -1,13 +1,15 @@
-use std::collections::HashMap;
-
 use crate::string;
-use crate::value::AxsValue;
+use crate::value::{AxsObject, AxsValue};
 
 fn unsigned_integer_syntax(value: &str) -> bool {
     value == "0"
         || (!value.is_empty()
             && !value.starts_with('0')
             && value.bytes().all(|c| c.is_ascii_digit()))
+}
+
+fn digits(value: &str) -> bool {
+    !value.is_empty() && value.bytes().all(|c| c.is_ascii_digit())
 }
 
 fn number_parts(value: &str) -> &str {
@@ -18,16 +20,25 @@ fn integer_syntax(value: &str) -> bool {
     unsigned_integer_syntax(number_parts(value))
 }
 
+// whole[.fraction][(e|E)[+|-]digits], with a fraction or an exponent present.
 fn float_syntax(value: &str) -> bool {
-    let digits = number_parts(value);
-
-    let Some((whole, fraction)) = digits.split_once('.') else {
-        return false;
+    let unsigned = number_parts(value);
+    let (mantissa, exponent) = match unsigned.split_once(['e', 'E']) {
+        Some((mantissa, exponent)) => (
+            mantissa,
+            Some(exponent.strip_prefix(['+', '-']).unwrap_or(exponent)),
+        ),
+        None => (unsigned, None),
+    };
+    let (whole, fraction) = match mantissa.split_once('.') {
+        Some((whole, fraction)) => (whole, Some(fraction)),
+        None => (mantissa, None),
     };
 
-    unsigned_integer_syntax(whole)
-        && !fraction.is_empty()
-        && fraction.bytes().all(|c| c.is_ascii_digit())
+    (fraction.is_some() || exponent.is_some())
+        && unsigned_integer_syntax(whole)
+        && fraction.is_none_or(digits)
+        && exponent.is_none_or(digits)
 }
 
 // Used by the token parser to classify numeric errors.
@@ -55,8 +66,15 @@ pub fn parse_value(input: &str) -> Result<AxsValue, String> {
         "false" => return Ok(AxsValue::Boolean(false)),
         "null" => return Ok(AxsValue::Null),
         "[]" => return Ok(AxsValue::Array(vec![])),
-        "{}" => return Ok(AxsValue::Object(HashMap::new())),
+        "{}" => return Ok(AxsValue::Object(AxsObject::new())),
         _ => {}
+    }
+
+    if value.starts_with(['[', '{']) {
+        return Err(format!(
+            "Strings starting with '{}' must be quoted",
+            &value[..1]
+        ));
     }
 
     if integer_syntax(value) {

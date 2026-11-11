@@ -1,0 +1,5 @@
+categories:
+  - UI:
+      - MUI
+      - Tailwind
+    name: components

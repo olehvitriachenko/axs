@@ -1,0 +1,11 @@
+{
+  "name": "axs-smoke-harness",
+  "displayName": "AXS smoke-test harness",
+  "description": "Development-only harness that drives the installed AXS Language extension. Not packaged.",
+  "version": "0.0.0",
+  "publisher": "axs-test",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  }
+}

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use crate::value::AxsObject;
 
 use serde::{Serialize, ser};
 
@@ -103,7 +103,7 @@ impl<'a> Serializer<'a> {
         self.tick()?;
         Ok(Object {
             serializer: self,
-            values: HashMap::new(),
+            values: AxsObject::new(),
             pending: None,
             variant,
         })
@@ -246,7 +246,7 @@ impl<'a> ser::Serializer for Serializer<'a> {
         self.check_block()?;
         let key = self.key(variant)?;
         let value = value.serialize(self.child())?;
-        Ok(AxsValue::Object(HashMap::from([(key, value)])))
+        Ok(AxsValue::Object(AxsObject::from([(key, value)])))
     }
     fn serialize_seq(self, _len: Option<usize>) -> Result<Sequence<'a>> {
         self.seq(None, None)
@@ -321,7 +321,7 @@ impl Sequence<'_> {
         }
         let value = AxsValue::Array(self.values);
         Ok(match self.variant {
-            Some(key) => AxsValue::Object(HashMap::from([(key, value)])),
+            Some(key) => AxsValue::Object(AxsObject::from([(key, value)])),
             None => value,
         })
     }
@@ -347,7 +347,7 @@ sequence_impl!(SerializeTupleVariant, serialize_field);
 
 pub(super) struct Object<'a> {
     serializer: Serializer<'a>,
-    values: HashMap<String, AxsValue>,
+    values: AxsObject,
     pending: Option<String>,
     variant: Option<String>,
 }
@@ -375,7 +375,7 @@ impl Object<'_> {
         }
         let value = AxsValue::Object(self.values);
         Ok(match self.variant {
-            Some(key) => AxsValue::Object(HashMap::from([(key, value)])),
+            Some(key) => AxsValue::Object(AxsObject::from([(key, value)])),
             None => value,
         })
     }
