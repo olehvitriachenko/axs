@@ -5,6 +5,15 @@
 No published release history was verified. The manifest is still 0.1.0; earlier
 development milestone labels are not asserted to be crates.io releases.
 
+### Added: MCP proxy (`@axs-lang/mcp`, not published)
+
+- `axs-mcp [--config F] [--rule tool=query] [--no-query-arg] -- command...`
+  runs a stdio MCP server through a proxy that rewrites JSON tool results as AXS
+  and adds an optional `axs_query` argument to every tool; the model's query
+  (or a configured per-tool default) is applied before the result is returned.
+  `axsContent` / `axsResult` let server authors return AXS directly. Tested
+  end to end against a fake upstream with the official MCP client.
+
 ### Changed: SDK and VS Code extension follow Grammar v3
 
 - `@axs-lang/core` (checkout 0.2.0) adds `query(document, text)` over the new

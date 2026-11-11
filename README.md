@@ -125,6 +125,17 @@ parentheses. On the benchmark's GitHub issues, selecting the open issues'
 number, title, and comment count is 310 tokens instead of 3,937 for the whole
 document as minified JSON. Errors use `AXS012` and name the available fields.
 
+## MCP
+
+`packages/axs-mcp` (`@axs-lang/mcp`, not published) puts AXS inside
+[MCP](https://modelcontextprotocol.io): the `axs-mcp` proxy runs any stdio MCP
+server and returns its tool results as AXS, and every tool gains an optional
+`axs_query` argument so a model can ask for only what it needs. On the
+benchmark's GitHub issues, a server's 5,767-token JSON result becomes 4,447
+tokens through the proxy and 310 with a query. Server authors can call
+`axsContent` / `axsResult` directly. See
+[packages/axs-mcp/README.md](packages/axs-mcp/README.md).
+
 ## Command-line interface
 
 Install from this checkout (no registry publication is assumed):
