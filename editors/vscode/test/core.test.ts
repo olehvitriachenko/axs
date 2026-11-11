@@ -37,8 +37,11 @@ test("valid documents pass check and format idempotently", () => {
   axs.check(source);
   const formatted = axs.format(source);
   assert.equal(axs.format(formatted), formatted);
-  assert.match(formatted, /maxUploadBytes = 9223372036854775807/);
-  assert.match(formatted, /ratio = 1\.0/);
+  assert.match(formatted, /maxUploadBytes: 9223372036854775807/);
+  assert.match(formatted, /ratio: 1\.0/);
+  assert.match(formatted, /users\[2\]\{id,name\}:\n {2}1,Oleh\n {2}2,Alex\n/);
+  assert.match(formatted, /owner: \{login: oleh,id: 1\}/);
+  assert.match(formatted, /notes: \|\n {2}First line\n {4}indented\n/);
   assert.ok(!formatted.includes("# Application settings"), "comments are dropped by fmt");
 });
 
@@ -49,8 +52,8 @@ test("invalid documents produce structured errors mapped to UTF-16 ranges", () =
   assert.equal(error.line, 2);
   const range = axsRange(lines(escape), error.line, error.column, error.length);
   assert.equal(range.startLine, 1);
-  // The core points at the string, which starts at UTF-16 offset 8.
-  assert.equal(range.startCharacter, 8);
+  // The core points at the string, which starts at UTF-16 offset 7.
+  assert.equal(range.startCharacter, 7);
   assert.ok(range.endCharacter > range.startCharacter);
 
   const duplicate = captured(() => axs.check(fixture("invalid-duplicate.axs")));
@@ -60,14 +63,14 @@ test("invalid documents produce structured errors mapped to UTF-16 ranges", () =
 });
 
 test("format output matches axs fmt for CRLF input", () => {
-  assert.equal(axs.format(fixture("unformatted-crlf.axs")), "a:\n  - x\nb = 1.0\nz = 1\n");
+  assert.equal(axs.format(fixture("unformatted-crlf.axs")), "z: 1\nb: 1.0\na[1]: [x]\n");
 });
 
 test("handles documents near the 8 MiB limit quickly enough for live diagnostics", () => {
   const value = "v".repeat(1000);
   let source = "";
   for (let index = 0; source.length + 1100 < 8 * 1024 * 1024; index += 1) {
-    source += `k${index} = ${value}\n`;
+    source += `k${index}: ${value}\n`;
   }
   let started = performance.now();
   axs.check(source);

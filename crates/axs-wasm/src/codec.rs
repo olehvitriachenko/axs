@@ -45,6 +45,13 @@ pub fn encode_ok_object(object: &AxsObject) -> Vec<u8> {
     output
 }
 
+/// A success envelope holding any value, used for query results.
+pub fn encode_ok_value(value: &AxsValue) -> Vec<u8> {
+    let mut output = vec![STATUS_OK];
+    write_value(value, &mut output);
+    output
+}
+
 pub fn encode_ok_text(text: &str) -> Vec<u8> {
     let mut output = Vec::with_capacity(text.len() + 1);
     output.push(STATUS_OK);
@@ -389,5 +396,26 @@ mod tests {
         let failed = crate::parse("name");
         assert_eq!(failed[0], STATUS_ERROR);
         assert_eq!(crate::stringify(&[0xff])[0], STATUS_ERROR);
+    }
+
+    #[test]
+    fn queries_return_any_value() {
+        let result =
+            crate::query_source("users[2]{name,age}:\n  Oleh,22\n  Alex,25\n", "users.age");
+        assert_eq!(result[0], STATUS_OK);
+        assert_eq!(&result[1..2], &[TAG_ARRAY]);
+        let object = axs::parse("a: 1").unwrap();
+        let payload = encode_ok_object(&object);
+        assert_eq!(
+            crate::query(&payload[1..], "a"),
+            encode_ok_value(&AxsValue::Integer(1))
+        );
+        let error = crate::query(&payload[1..], "b");
+        assert_eq!(error[0], STATUS_ERROR);
+        let mut reader = Reader {
+            bytes: &error[1..],
+            offset: 0,
+        };
+        assert_eq!(reader.string().unwrap(), "AXS012");
     }
 }

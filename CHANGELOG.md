@@ -5,6 +5,17 @@
 No published release history was verified. The manifest is still 0.1.0; earlier
 development milestone labels are not asserted to be crates.io releases.
 
+### Changed: SDK and VS Code extension follow Grammar v3
+
+- `@axs-lang/core` (checkout 0.2.0) adds `query(document, text)` over the new
+  `query`/`querySource` WebAssembly exports, the `LengthMismatch`,
+  `InvalidCollection`, and `InvalidQuery` error kinds (AXS010-AXS012), and keeps
+  key order in `parse`/`stringify`; keys that are not bare keys are written
+  quoted instead of rejected.
+- The VS Code extension highlights tables, lengths, inline arrays/objects, and
+  text blocks, and Smart Enter and auto-indent handle them. Verified in a real
+  VS Code with the installed-VSIX smoke test (15/15 steps).
+
 ### Added: queries
 
 - `axs::query` and `axs query [--from-json] [--json] QUERY FILE` select,

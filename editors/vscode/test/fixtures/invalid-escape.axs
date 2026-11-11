@@ -1,2 +1,2 @@
-name = 🚀🚀
-title = "🚀\q"
+name: 🚀🚀
+title: "🚀\q"

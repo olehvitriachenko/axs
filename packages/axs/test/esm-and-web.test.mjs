@@ -22,11 +22,11 @@ test("ESM named imports resolve to the Node.js build", () => {
 });
 
 test("web build requires initialization and supports retry and repeated init", async () => {
-  assert.throws(() => web.parse("a = 1"), /not initialized/);
+  assert.throws(() => web.parse("a: 1"), /not initialized/);
   assert.throws(() => web.stringify({ a: 1 }), /not initialized/);
 
   await assert.rejects(web.init(new Uint8Array([0, 1, 2, 3])));
-  assert.throws(() => web.parse("a = 1"), /not initialized/);
+  assert.throws(() => web.parse("a: 1"), /not initialized/);
 
   const bytes = await readFile(wasmPath);
   await Promise.all([web.init(bytes), web.init(bytes), web.init()]);
@@ -37,5 +37,5 @@ test("web build requires initialization and supports retry and repeated init", a
   const decoded = web.parse(web.stringify(original));
   assert.deepEqual(decoded, original);
   assert.equal(typeof decoded.id, "bigint");
-  assert.throws(() => web.parse("a = 1\na = 2"), web.AxsError);
+  assert.throws(() => web.parse("a: 1\na: 2"), web.AxsError);
 });

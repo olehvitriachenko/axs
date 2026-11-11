@@ -20,16 +20,16 @@ const cli = join(
 );
 
 const documents = {
-  floats: "b = 1.0\na = 100000000000000000000.0\nc = 2.50\nd = -0.0\ne = 0.000000001\n",
-  integers: "max = 9223372036854775807\nmin = -9223372036854775808\nsmall = 7\n",
+  floats: "b: 1.0\na: 100000000000000000000.0\nc: 2.50\nd: -0.0\ne: 0.000000001\n",
+  integers: "max: 9223372036854775807\nmin: -9223372036854775808\nsmall: 7\n",
   nested:
-    "user:\n  name = Oleh\n  skills:\n    - Rust\n    -\n      - nested\ncategories:\n  - UI:\n      - MUI\n    weight = 2\n",
-  comments: "# heading\nz = 1\n\n# trailing\na = 2\n",
+    "user:\n  name: Oleh\n  skills:\n    - Rust\n    -\n      - nested\ncategories:\n  - UI:\n      - MUI\n    weight: 2\n",
+  comments: "# heading\nz: 1\n\n# trailing\na: 2\n",
   strings:
-    'quoted = "true"\nspaces = " padded "\nescapes = "a\\nb\\t\\"c\\""\nunicode = Олег 🚀\nlist:\n  - "UI:"\n  - \"http://host\"\n',
-  empties: "a = []\nb = {}\nc = \"\"\n",
-  crlf: "b = 1\r\na:\r\n  - x\r\n",
-  canonical: "a = 1\nb:\n  c = true\n",
+    'quoted: "true"\nspaces: " padded "\nescapes: "a\\nb\\t\\"c\\""\nunicode: Олег 🚀\nlist:\n  - "UI:"\n  - \"http://host\"\n',
+  empties: "a: []\nb: {}\nc: \"\"\n",
+  crlf: "b: 1\r\na:\r\n  - x\r\n",
+  canonical: "a: 1\nb: {c: true}\n",
   empty: "",
   profile: readFileSync(join(repository, "profile.axs"), "utf8")
 };
@@ -37,7 +37,7 @@ const documents = {
 test("format matches documented canonical output", () => {
   assert.equal(
     format(documents.floats),
-    "a = 100000000000000000000.0\nb = 1.0\nc = 2.5\nd = -0.0\ne = 0.000000001\n"
+    "b: 1.0\na: 100000000000000000000.0\nc: 2.5\nd: -0.0\ne: 1e-9\n"
   );
   assert.equal(format(documents.canonical), documents.canonical);
   assert.equal(format(""), "");
@@ -47,15 +47,15 @@ test("format matches documented canonical output", () => {
 test("check accepts valid documents and reports structured errors", () => {
   for (const source of Object.values(documents)) check(source);
   assert.throws(
-    () => check("a = 1\na = 2"),
+    () => check("a: 1\na: 2"),
     (error) => error instanceof AxsError && error.code === "AXS005" && error.line === 2
   );
   assert.throws(
-    () => format('name = "🚀\\q"'),
-    (error) => error instanceof AxsError && error.code === "AXS007" && error.column === 8
+    () => format('name: "🚀\\q"'),
+    (error) => error instanceof AxsError && error.code === "AXS007" && error.column === 7
   );
   assert.throws(() => check("x".repeat(8 * 1024 * 1024 + 1)), AxsError);
-  assert.throws(() => check("a = \uD800"), (error) => error.code === "AXS007");
+  assert.throws(() => check("a: \uD800"), (error) => error.code === "AXS007");
   assert.throws(() => check(42), TypeError);
 });
 
@@ -64,7 +64,7 @@ test("check and format handle documents near the 8 MiB limit", () => {
   const value = "v".repeat(1000);
   let source = "";
   for (let index = 0; source.length + 1100 < 8 * 1024 * 1024; index += 1) {
-    source += `k${index} = ${value}\n`;
+    source += `k${index}: ${value}\n`;
   }
   check(source);
   const formatted = format(source);
@@ -83,9 +83,9 @@ test("format and check agree with the Rust CLI", { skip: !existsSync(cli) && "CL
       assert.equal(format(source), readFileSync(file, "utf8"), `${name} formats like axs fmt`);
     }
     const invalid = join(directory, "invalid.axs");
-    writeFileSync(invalid, "a = 1\na = 2");
+    writeFileSync(invalid, "a: 1\na: 2");
     assert.throws(() => execFileSync(cli, ["check", invalid], { stdio: "pipe" }));
-    assert.throws(() => check("a = 1\na = 2"), AxsError);
+    assert.throws(() => check("a: 1\na: 2"), AxsError);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

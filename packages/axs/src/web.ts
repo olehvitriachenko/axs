@@ -3,7 +3,7 @@
  * with `await init()` (or `initSync`) before `parse` or `stringify` are called.
  */
 import initWasm, * as wasm from "../wasm/web.mjs";
-import { type AxsObject, createApi } from "./core.js";
+import { type AxsObject, type AxsValue, createApi } from "./core.js";
 
 export {
   AxsError,
@@ -95,9 +95,9 @@ export function check(source: string): void {
 
 /**
  * Canonically formats an AXS document, producing the same text as `axs fmt`
- * (sorted keys, canonical quoting, LF newlines). Values never pass through
+ * (key order kept, canonical quoting, LF newlines). Values never pass through
  * JavaScript numbers, so `1.0` stays a float and large floats are kept exactly.
- * Comments, original quoting, and key order are not preserved.
+ * Comments and original quoting are not preserved.
  *
  * @throws {AxsError} for invalid documents.
  */
@@ -114,4 +114,16 @@ export function stringify(value: AxsObject): string;
 export function stringify(value: object): string;
 export function stringify(value: object): string {
   return api.stringify(value);
+}
+
+/**
+ * Runs an AXS query (`users[age > 20]{name}`; see spec/QUERY.md) on a
+ * document, given as AXS text or a plain object, and returns the selected
+ * value. Requires prior initialization.
+ *
+ * @throws {AxsError} with kind `InvalidQuery` (AXS012) for invalid queries,
+ * missing fields, or out-of-range indexes, or for invalid documents.
+ */
+export function query(document: object | string, query: string): AxsValue {
+  return api.query(document, query);
 }

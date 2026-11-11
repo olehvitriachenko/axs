@@ -3,21 +3,13 @@
   "name": "AXS",
   "scopeName": "source.axs",
   "patterns": [
-    {
-      "include": "#comments"
-    },
-    {
-      "include": "#blockHeaders"
-    },
-    {
-      "include": "#assignments"
-    },
-    {
-      "include": "#arrayItems"
-    },
-    {
-      "include": "#arrayMarkers"
-    }
+    { "include": "#textBlocks" },
+    { "include": "#comments" },
+    { "include": "#blockHeaders" },
+    { "include": "#fields" },
+    { "include": "#arrayMarkers" },
+    { "include": "#arrayItems" },
+    { "include": "#rows" }
   ],
   "repository": {
     "comments": {
@@ -28,45 +20,67 @@
         }
       ]
     },
+    "textBlocks": {
+      "patterns": [
+        {
+          "comment": "key: |  (content is one level deeper)",
+          "begin": "^(\\s*)((?:[A-Za-z_][A-Za-z0-9_.-]*)|(?:\"(?:[^\"\\\\]|\\\\.)*\"))(\\s*:)\\s+(\\|)\\s*$",
+          "end": "^(?!\\1  |\\s*$)",
+          "beginCaptures": {
+            "2": { "name": "variable.other.property.axs" },
+            "3": { "name": "punctuation.separator.key-value.axs" },
+            "4": { "name": "keyword.control.text-block.axs" }
+          },
+          "contentName": "string.unquoted.block.axs"
+        },
+        {
+          "comment": "- key: |  (content is two levels deeper than the dash)",
+          "begin": "^(\\s*)(-\\s+)((?:[A-Za-z_][A-Za-z0-9_.-]*)|(?:\"(?:[^\"\\\\]|\\\\.)*\"))(\\s*:)\\s+(\\|)\\s*$",
+          "end": "^(?!\\1    |\\s*$)",
+          "beginCaptures": {
+            "2": { "name": "punctuation.definition.list.axs" },
+            "3": { "name": "variable.other.property.axs" },
+            "4": { "name": "punctuation.separator.key-value.axs" },
+            "5": { "name": "keyword.control.text-block.axs" }
+          },
+          "contentName": "string.unquoted.block.axs"
+        },
+        {
+          "comment": "- |",
+          "begin": "^(\\s*)(-)\\s+(\\|)\\s*$",
+          "end": "^(?!\\1  |\\s*$)",
+          "beginCaptures": {
+            "2": { "name": "punctuation.definition.list.axs" },
+            "3": { "name": "keyword.control.text-block.axs" }
+          },
+          "contentName": "string.unquoted.block.axs"
+        }
+      ]
+    },
     "blockHeaders": {
       "patterns": [
         {
-          "match": "^(\\s*)(-\\s+)?([A-Za-z_][A-Za-z0-9_-]*)(\\s*:)\\s*$",
+          "match": "^(\\s*)(-\\s+)?((?:[A-Za-z_][A-Za-z0-9_.-]*)|(?:\"(?:[^\"\\\\]|\\\\.)*\"))(\\[\\d*\\])?(\\{[^}]*\\})?(\\s*:)\\s*$",
           "captures": {
-            "2": {
-              "name": "punctuation.definition.list.axs"
-            },
-            "3": {
-              "name": "entity.name.tag.axs"
-            },
-            "4": {
-              "name": "punctuation.separator.key-value.axs"
-            }
+            "2": { "name": "punctuation.definition.list.axs" },
+            "3": { "name": "entity.name.tag.axs" },
+            "4": { "name": "constant.numeric.length.axs" },
+            "5": { "patterns": [{ "include": "#columns" }] },
+            "6": { "name": "punctuation.separator.key-value.axs" }
           }
         }
       ]
     },
-    "assignments": {
+    "fields": {
       "patterns": [
         {
-          "match": "^(\\s*)(-\\s+)?([A-Za-z_][A-Za-z0-9_-]*)(\\s*=)\\s*(.*?)\\s*$",
+          "match": "^(\\s*)(-\\s+)?((?:[A-Za-z_][A-Za-z0-9_.-]*)|(?:\"(?:[^\"\\\\]|\\\\.)*\"))(\\[\\d*\\])?(\\s*:)(?=\\s)\\s*(.*?)\\s*$",
           "captures": {
-            "2": {
-              "name": "punctuation.definition.list.axs"
-            },
-            "3": {
-              "name": "variable.other.property.axs"
-            },
-            "4": {
-              "name": "keyword.operator.assignment.axs"
-            },
-            "5": {
-              "patterns": [
-                {
-                  "include": "#value"
-                }
-              ]
-            }
+            "2": { "name": "punctuation.definition.list.axs" },
+            "3": { "name": "variable.other.property.axs" },
+            "4": { "name": "constant.numeric.length.axs" },
+            "5": { "name": "punctuation.separator.key-value.axs" },
+            "6": { "patterns": [{ "include": "#value" }] }
           }
         }
       ]
@@ -74,8 +88,10 @@
     "arrayMarkers": {
       "patterns": [
         {
-          "name": "punctuation.definition.list.axs",
-          "match": "^\\s*-(?=\\s*$)"
+          "match": "^(\\s*)(-)(?=\\s*$)",
+          "captures": {
+            "2": { "name": "punctuation.definition.list.axs" }
+          }
         }
       ]
     },
@@ -84,19 +100,86 @@
         {
           "match": "^(\\s*)(-)\\s+(.*?)\\s*$",
           "captures": {
-            "2": {
-              "name": "punctuation.definition.list.axs"
-            },
-            "3": {
-              "patterns": [
-                {
-                  "include": "#value"
-                }
-              ]
-            }
+            "2": { "name": "punctuation.definition.list.axs" },
+            "3": { "patterns": [{ "include": "#value" }] }
           }
         }
       ]
+    },
+    "rows": {
+      "patterns": [
+        {
+          "comment": "Table rows: comma-separated cells without a dash.",
+          "match": "^(\\s+)(\\S.*?)\\s*$",
+          "captures": {
+            "2": { "patterns": [{ "include": "#cells" }] }
+          }
+        }
+      ]
+    },
+    "columns": {
+      "patterns": [
+        { "name": "punctuation.definition.table.axs", "match": "[{}]" },
+        { "name": "punctuation.separator.comma.axs", "match": "," },
+        { "name": "variable.other.property.axs", "match": "\"(?:[^\"\\\\]|\\\\.)*\"|[A-Za-z_][A-Za-z0-9_.-]*" }
+      ]
+    },
+    "cells": {
+      "patterns": [
+        { "name": "punctuation.separator.comma.axs", "match": "," },
+        { "include": "#string" },
+        {
+          "name": "constant.language.axs",
+          "match": "(?:true|false|null)(?=\\s*(?:,|\\]|\\}|$))"
+        },
+        {
+          "name": "constant.numeric.axs",
+          "match": "-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?(?=\\s*(?:,|\\]|\\}|$))"
+        },
+        { "name": "string.unquoted.axs", "match": "[^,\\]}\\s](?:[^,\\]}]*[^,\\]}\\s])?" }
+      ]
+    },
+    "string": {
+      "name": "string.quoted.double.axs",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.string.begin.axs" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.axs" }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.axs",
+          "match": "\\\\(?:[\"\\\\nrt0]|u\\{[0-9a-fA-F]+\\})"
+        }
+      ]
+    },
+    "inlineObject": {
+      "name": "meta.object.inline.axs",
+      "begin": "\\{(?!\\})",
+      "end": "\\}",
+      "beginCaptures": { "0": { "name": "punctuation.definition.object.begin.axs" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.object.end.axs" } },
+      "patterns": [
+        {
+          "match": "((?:[A-Za-z_][A-Za-z0-9_.-]*)|(?:\"(?:[^\"\\\\]|\\\\.)*\"))(\\s*:)",
+          "captures": {
+            "1": { "name": "variable.other.property.axs" },
+            "2": { "name": "punctuation.separator.key-value.axs" }
+          }
+        },
+        { "include": "#cells" }
+      ]
+    },
+    "inlineArray": {
+      "name": "meta.array.inline.axs",
+      "begin": "\\[(?!\\])",
+      "end": "\\]",
+      "beginCaptures": { "0": { "name": "punctuation.definition.array.begin.axs" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.array.end.axs" } },
+      "patterns": [{ "include": "#cells" }]
     },
     "value": {
       "patterns": [
@@ -106,33 +189,15 @@
         },
         {
           "name": "constant.numeric.axs",
-          "match": "-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?$"
+          "match": "-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
         },
         {
           "name": "constant.language.empty-collection.axs",
           "match": "(?:\\[\\]|\\{\\})$"
         },
-        {
-          "name": "string.quoted.double.axs",
-          "begin": "\"",
-          "end": "\"",
-          "beginCaptures": {
-            "0": {
-              "name": "punctuation.definition.string.begin.axs"
-            }
-          },
-          "endCaptures": {
-            "0": {
-              "name": "punctuation.definition.string.end.axs"
-            }
-          },
-          "patterns": [
-            {
-              "name": "constant.character.escape.axs",
-              "match": "\\\\(?:[\"\\\\nrt0]|u\\{[0-9a-fA-F]+\\})"
-            }
-          ]
-        },
+        { "include": "#inlineArray" },
+        { "include": "#inlineObject" },
+        { "include": "#string" },
         {
           "name": "string.unquoted.axs",
           "match": ".+$"

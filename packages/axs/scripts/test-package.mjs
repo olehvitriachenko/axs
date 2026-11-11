@@ -102,7 +102,7 @@ const decoded: AxsObject = parse(text);
 const id: AxsValue = decoded.id;
 if (id !== 9223372036854775807n) throw new Error("bigint lost");
 try {
-  parse("a = 1\\na = 2");
+  parse("a: 1\\na: 2");
   throw new Error("expected AxsError");
 } catch (error) {
   if (!(error instanceof AxsError) || error.code !== "AXS005") throw error;

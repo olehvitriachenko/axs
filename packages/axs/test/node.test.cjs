@@ -4,7 +4,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { parse, stringify, init, AxsError } = require("@axs-lang/core");
+const { parse, stringify, init, query, AxsError } = require("@axs-lang/core");
 
 function expectAxsError(callback, expected) {
   let caught;
@@ -25,8 +25,8 @@ function expectAxsError(callback, expected) {
 test("parses and stringifies the documented example", () => {
   const source = `
 server:
-  port = 3000
-  enabled = true
+  port: 3000
+  enabled: true
   skills:
     - Rust
     - TypeScript
@@ -38,7 +38,7 @@ server:
   const encoded = stringify(config);
   assert.equal(
     encoded,
-    "server:\n  enabled = true\n  port = 3000\n  skills:\n    - Rust\n    - TypeScript\n"
+    "server:\n  port: 3000\n  enabled: true\n  skills[2]: [Rust,TypeScript]\n"
   );
   assert.deepEqual(parse(encoded), config);
 });
@@ -46,7 +46,7 @@ server:
 test("preserves i64 maximum as bigint through a round trip", () => {
   const original = { id: 9223372036854775807n, name: "Oleh", enabled: true };
   const encoded = stringify(original);
-  assert.equal(encoded, "enabled = true\nid = 9223372036854775807\nname = Oleh\n");
+  assert.equal(encoded, "id: 9223372036854775807\nname: Oleh\nenabled: true\n");
   const decoded = parse(encoded);
   assert.equal(typeof decoded.id, "bigint");
   assert.equal(decoded.id, 9223372036854775807n);
@@ -56,13 +56,13 @@ test("preserves i64 maximum as bigint through a round trip", () => {
 test("maps integers to number inside the safe range and bigint outside it", () => {
   const decoded = parse(
     [
-      "max = 9223372036854775807",
-      "min = -9223372036854775808",
-      "safe = 9007199254740991",
-      "safeNegative = -9007199254740991",
-      "unsafe = 9007199254740992",
-      "unsafeNegative = -9007199254740992",
-      "zero = 0"
+      "max: 9223372036854775807",
+      "min: -9223372036854775808",
+      "safe: 9007199254740991",
+      "safeNegative: -9007199254740991",
+      "unsafe: 9007199254740992",
+      "unsafeNegative: -9007199254740992",
+      "zero: 0"
     ].join("\n")
   );
   assert.equal(decoded.max, 9223372036854775807n);
@@ -76,9 +76,9 @@ test("maps integers to number inside the safe range and bigint outside it", () =
 });
 
 test("accepts bigint only within i64 and normalizes small bigints to numbers", () => {
-  assert.equal(stringify({ a: 5n }), "a = 5\n");
+  assert.equal(stringify({ a: 5n }), "a: 5\n");
   assert.equal(parse(stringify({ a: 5n })).a, 5);
-  assert.equal(stringify({ a: -(2n ** 63n) }), "a = -9223372036854775808\n");
+  assert.equal(stringify({ a: -(2n ** 63n) }), "a: -9223372036854775808\n");
   expectAxsError(() => stringify({ a: 2n ** 63n }), {
     code: "AXS008",
     kind: "InvalidNumber",
@@ -96,14 +96,14 @@ test("rejects unsafe integer numbers instead of losing precision", () => {
   assert.match(error.help, /bigint/);
   expectAxsError(() => stringify({ id: -(2 ** 53) }), { code: "AXS008" });
   expectAxsError(() => stringify({ huge: Number.MAX_VALUE }), { code: "AXS008" });
-  assert.equal(stringify({ id: Number.MAX_SAFE_INTEGER }), "id = 9007199254740991\n");
+  assert.equal(stringify({ id: Number.MAX_SAFE_INTEGER }), "id: 9007199254740991\n");
 });
 
 test("preserves negative zero and float boundaries", () => {
-  assert.equal(stringify({ z: -0 }), "z = -0.0\n");
-  assert.ok(Object.is(parse("z = -0.0").z, -0));
+  assert.equal(stringify({ z: -0 }), "z: -0.0\n");
+  assert.ok(Object.is(parse("z: -0.0").z, -0));
   assert.ok(Object.is(parse(stringify({ z: -0 })).z, -0));
-  assert.ok(Object.is(parse("z = 0.0").z, 0));
+  assert.ok(Object.is(parse("z: 0.0").z, 0));
 
   const floats = [
     0.1,
@@ -124,10 +124,10 @@ test("preserves negative zero and float boundaries", () => {
   }
 
   // Integral floats beyond 2^53 parse exactly (stringify would require bigint).
-  const max = parse(`max = ${BigInt(Number.MAX_VALUE)}.0`).max;
+  const max = parse(`max: ${BigInt(Number.MAX_VALUE)}.0`).max;
   assert.equal(max, Number.MAX_VALUE);
   // Integral floats within the safe range become JavaScript integers.
-  assert.equal(stringify(parse("x = 1.0")), "x = 1\n");
+  assert.equal(stringify(parse("x: 1.0")), "x: 1\n");
 });
 
 test("rejects non-finite numbers", () => {
@@ -143,7 +143,7 @@ test("rejects non-finite numbers", () => {
 test("handles nested objects, arrays, and Grammar v2 inline objects", () => {
   const source = [
     "user:",
-    "  name = Oleh",
+    "  name: Oleh",
     "  tags:",
     "    - a",
     "    -",
@@ -152,9 +152,9 @@ test("handles nested objects, arrays, and Grammar v2 inline objects", () => {
     "  - UI:",
     "      - MUI",
     "      - Tailwind",
-    "    weight = 2",
+    "    weight: 2",
     "  -",
-    "    name = plain"
+    "    name: plain"
   ].join("\n");
   const value = parse(source);
   assert.deepEqual(value, {
@@ -165,7 +165,7 @@ test("handles nested objects, arrays, and Grammar v2 inline objects", () => {
 });
 
 test("rejects the legacy bare block syntax", () => {
-  expectAxsError(() => parse("user\n  name = Oleh"), {});
+  expectAxsError(() => parse("user\n  name: Oleh"), {});
 });
 
 test("round-trips empty collections and empty documents", () => {
@@ -190,7 +190,7 @@ test("quotes reserved and ambiguous strings so they stay strings", () => {
     " padded ",
     "UI:",
     "http://host",
-    "a = b",
+    "a: b",
     "- item",
     '"quoted"',
     "#comment"
@@ -215,24 +215,24 @@ test("round-trips Unicode and escaped strings", () => {
     separators: "\u2028\u2029"
   };
   assert.deepEqual(parse(stringify(value)), value);
-  assert.equal(parse('s = "a\\nb\\t\\"c\\""').s, 'a\nb\t"c"');
+  assert.equal(parse('s: "a\\nb\\t\\"c\\""').s, 'a\nb\t"c"');
 });
 
 test("reports structured syntax errors with code-point columns", () => {
-  const error = expectAxsError(() => parse('name = "🚀\\q"'), {
+  const error = expectAxsError(() => parse('name: "🚀\\q"'), {
     code: "AXS007",
     kind: "InvalidString",
     line: 1,
-    column: 8
+    column: 7
   });
   assert.match(error.message, /^AXS007: /);
-  assert.match(error.message, /line 1, column 8/);
+  assert.match(error.message, /line 1, column 7/);
   assert.equal(typeof error.reason, "string");
   assert.equal(typeof error.length, "number");
 });
 
 test("reports duplicate keys", () => {
-  expectAxsError(() => parse("a = 1\na = 2"), {
+  expectAxsError(() => parse("a: 1\na: 2"), {
     code: "AXS005",
     kind: "DuplicateKey",
     line: 2
@@ -240,14 +240,17 @@ test("reports duplicate keys", () => {
 });
 
 test("reports invalid indentation", () => {
-  expectAxsError(() => parse("a:\n   b = 1"), { code: "AXS002", kind: "InvalidIndentation" });
+  expectAxsError(() => parse("a:\n   b: 1"), { code: "AXS002", kind: "InvalidIndentation" });
   expectAxsError(() => parse("a:\n\tb = 1"), { kind: "InvalidIndentation" });
 });
 
-test("reports invalid keys from the core serializer", () => {
-  expectAxsError(() => stringify({ "bad key": 1 }), { code: "AXS003", kind: "InvalidKey" });
-  expectAxsError(() => stringify({ "1abc": 1 }), { code: "AXS003" });
-  expectAxsError(() => stringify({ ok: { "a.b": 1 } }), { code: "AXS003" });
+test("quotes keys that are not bare AXS keys", () => {
+  const value = { "bad key": 1, "1abc": 2, ok: { "a.b": 3, "@id": 4 } };
+  assert.equal(
+    stringify(value),
+    '"bad key": 1\n"1abc": 2\nok: {a.b: 3,"@id": 4}\n'
+  );
+  assert.deepEqual(parse(stringify(value)), value);
 });
 
 test("enforces the nesting depth limit in both directions", () => {
@@ -256,10 +259,11 @@ test("enforces the nesting depth limit in both directions", () => {
     for (let index = 0; index < levels; index += 1) value = { n: value };
     return value;
   };
-  // Root plus 128 nested blocks is the maximum.
-  const deepest = nest(128);
+  // Root plus 128 nested blocks is the maximum; the innermost object of
+  // primitives is written inline on its parent's line.
+  const deepest = nest(129);
   assert.deepEqual(parse(stringify(deepest)), deepest);
-  expectAxsError(() => stringify(nest(129)), { kind: "InvalidIndentation" });
+  expectAxsError(() => stringify(nest(130)), { kind: "InvalidIndentation" });
   // An empty collection may sit inline below the deepest block.
   let withEmpty = { leaf: {} };
   for (let index = 0; index < 128; index += 1) withEmpty = { n: withEmpty };
@@ -271,13 +275,13 @@ test("enforces the nesting depth limit in both directions", () => {
 
   let source = "";
   for (let depth = 0; depth <= 130; depth += 1) source += `${"  ".repeat(depth)}n:\n`;
-  source += `${"  ".repeat(131)}leaf = 1\n`;
+  source += `${"  ".repeat(131)}leaf: 1\n`;
   expectAxsError(() => parse(source), { kind: "InvalidIndentation" });
 });
 
 test("enforces document size and token limits", () => {
   const huge = "x".repeat(8 * 1024 * 1024 + 1);
-  expectAxsError(() => parse(`a = ${huge}`), { code: "AXS009", kind: "SyntaxError" });
+  expectAxsError(() => parse(`a: ${huge}`), { code: "AXS009", kind: "SyntaxError" });
   expectAxsError(() => parse(huge), { code: "AXS009" });
   expectAxsError(() => stringify({ a: huge }), { code: "AXS009", path: "$.a" });
   const nearLimit = "y".repeat(8 * 1024 * 1024 - 16);
@@ -299,7 +303,7 @@ test("rejects cyclic references but accepts shared ones", () => {
   expectAxsError(() => stringify({ list }), { path: "$.list[0]" });
 
   const shared = { x: 1 };
-  assert.equal(stringify({ a: shared, b: shared }), "a:\n  x = 1\nb:\n  x = 1\n");
+  assert.equal(stringify({ a: shared, b: shared }), "a: {x: 1}\nb: {x: 1}\n");
 });
 
 test("rejects unsupported JavaScript values with a path", () => {
@@ -341,25 +345,49 @@ test("rejects unsupported roots", () => {
 test("accepts null-prototype objects and keeps __proto__ as data", () => {
   const bare = Object.create(null);
   bare.name = "bare";
-  assert.equal(stringify(bare), "name = bare\n");
+  assert.equal(stringify(bare), "name: bare\n");
 
-  const parsed = parse("__proto__:\n  polluted = true\nconstructor = x");
+  const parsed = parse("__proto__:\n  polluted: true\nconstructor: x");
   assert.equal(Object.getPrototypeOf(parsed), Object.prototype);
   assert.deepEqual(Object.keys(parsed), ["__proto__", "constructor"]);
   assert.equal(parsed.polluted, undefined);
   assert.equal({}.polluted, undefined);
-  assert.equal(stringify(parsed), "__proto__:\n  polluted = true\nconstructor = x\n");
+  assert.equal(stringify(parsed), "__proto__: {polluted: true}\nconstructor: x\n");
 });
 
 test("rejects unpaired surrogates instead of replacing them", () => {
-  expectAxsError(() => parse("a = \uD800"), { code: "AXS007", kind: "InvalidString" });
+  expectAxsError(() => parse("a: \uD800"), { code: "AXS007", kind: "InvalidString" });
   expectAxsError(() => stringify({ a: "x\uDC00" }), { code: "AXS007", path: "$.a" });
   assert.equal(parse(stringify({ a: "\uD83D\uDE80" })).a, "🚀");
 });
 
-test("returns keys in sorted, deterministic order", () => {
-  assert.deepEqual(Object.keys(parse("z = 1\na = 2\nm = 3")), ["a", "m", "z"]);
-  assert.equal(stringify({ z: 1, a: 2 }), stringify({ a: 2, z: 1 }));
+test("keeps key order in both directions", () => {
+  assert.deepEqual(Object.keys(parse("z: 1\na: 2\nm: 3")), ["z", "a", "m"]);
+  assert.equal(stringify({ z: 1, a: 2 }), "z: 1\na: 2\n");
+});
+
+test("queries documents given as objects or AXS text", () => {
+  const data = {
+    users: [
+      { name: "Oleh", age: 22 },
+      { name: "Alex", age: 25 },
+      { name: "Maria", age: 31 }
+    ]
+  };
+  assert.deepEqual(query(data, "users[age > 22]{name}"), [{ name: "Alex" }, { name: "Maria" }]);
+  assert.equal(query(data, "users[-1].name"), "Maria");
+  assert.deepEqual(query(stringify(data), "users.age"), [22, 25, 31]);
+  assert.equal(query("big: 9223372036854775807", "big"), 9223372036854775807n);
+  const error = expectAxsError(() => query(data, "users[0].nmae"), {
+    code: "AXS012",
+    kind: "InvalidQuery",
+    line: 1,
+    column: 10
+  });
+  assert.equal(error.help, "Available fields: name, age");
+  expectAxsError(() => query(data, "users[age = 1]"), { code: "AXS012" });
+  expectAxsError(() => query("a = 1", "a"), { code: "AXS001" });
+  assert.throws(() => query(data, 42), TypeError);
 });
 
 test("keeps working after errors and repeated calls", async () => {
@@ -370,7 +398,7 @@ test("keeps working after errors and repeated calls", async () => {
   }
   await init();
   await Promise.all([init(), init()]);
-  assert.deepEqual(parse("a = 1"), { a: 1 });
+  assert.deepEqual(parse("a: 1"), { a: 1 });
 });
 
 test("does not call back into stringify for getter exceptions", () => {

@@ -20,19 +20,22 @@ import { parse, stringify } from "@axs-lang/core";
 
 const source = `
 server:
-  port = 3000
-  enabled = true
+  port: 3000
+  enabled: true
   skills:
     - Rust
     - TypeScript
 `;
 
 const config = parse(source);
-// { server: { enabled: true, port: 3000, skills: ["Rust", "TypeScript"] } }
+// { server: { port: 3000, enabled: true, skills: ["Rust", "TypeScript"] } }
 
 const encoded = stringify(config);
-// "server:\n  enabled = true\n  port = 3000\n  skills:\n    - Rust\n    - TypeScript\n"
+// "server:\n  port: 3000\n  enabled: true\n  skills[2]: [Rust,TypeScript]\n"
 ```
+
+Grammar v3 (see the repository's `spec/AXS.md`) replaces v2: `key = value` is no
+longer valid, and the SDK needs the matching WebAssembly build.
 
 ## API
 
@@ -41,6 +44,7 @@ function parse(source: string): AxsObject;
 function stringify(value: AxsObject | object): string;
 function check(source: string): void;    // 0.2.0+: validate like `axs check`
 function format(source: string): string; // 0.2.0+: canonical text, identical to `axs fmt`
+function query(document: object | string, query: string): AxsValue; // select/filter/project
 function init(): Promise<void>; // see "Initialization"
 class AxsError extends Error { code; kind; reason; line?; column?; length?; help?; path? }
 type AxsValue = string | number | bigint | boolean | null | AxsValue[] | AxsObject;
@@ -48,11 +52,11 @@ interface AxsObject { [key: string]: AxsValue }
 ```
 
 `parse` returns a plain object, because every AXS document has an object root.
-Keys are returned in sorted order, since source key order isn't retained by the
-core. Comments are discarded.
+Keys are returned in source order. Comments are discarded.
 
-`stringify` produces canonical AXS: sorted keys, two-space indentation, colon
-block headers, minimal quoting, and LF newlines. An empty object produces `""`.
+`stringify` produces canonical AXS: keys in insertion order, two-space
+indentation, tables for arrays of uniform objects, inline arrays and small
+inline objects, lengths on every array, minimal quoting, and LF newlines. An empty object produces `""`.
 It accepts plain objects (including `Object.create(null)` objects) as the root.
 It throws an `AxsError` for:
 
@@ -63,7 +67,7 @@ It throws an `AxsError` for:
 | Class instances: `Date`, `Map`, `Set`, typed arrays, boxed primitives, user classes | `AXS004` |
 | Cyclic references (shared, non-cyclic references are serialized at each use) | `AXS004` |
 | `NaN`, `±Infinity`, integer-valued numbers outside the safe range, bigints outside i64 | `AXS008` |
-| Keys that aren't valid AXS keys (`[A-Za-z_][A-Za-z0-9_-]*`), enumerable symbol keys | `AXS003` |
+| Enumerable symbol keys (keys that aren't bare AXS keys are written quoted) | `AXS003` |
 | Strings or keys with unpaired UTF-16 surrogates | `AXS007` |
 | Nesting deeper than 128 blocks | `AXS002` |
 | Output over 8 MiB or more than 262,144 tokens | `AXS009` |
@@ -221,3 +225,19 @@ into any project with `npm install /path/to/axs-lang-core-<version>.tgz`.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
+## Queries
+
+`query(document, text)` selects part of a document before it reaches a model
+(see `spec/QUERY.md` in the repository). The document is a plain object or AXS
+text:
+
+```ts
+import { query } from "@axs-lang/core";
+
+query(data, "users[age > 22]{name}"); // [{ name: "Alex" }, { name: "Maria" }]
+query(source, "users[-1].name");      // "Maria"
+```
+
+Invalid queries throw an `AxsError` with kind `InvalidQuery` (`AXS012`), a
+column in the query, and the available field names as `help`.

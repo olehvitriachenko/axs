@@ -1,4 +1,3 @@
-
 {
   "$schema": "vscode://schemas/language-configuration",
   "comments": {
@@ -8,14 +7,22 @@
     }
   },
   "brackets": [
-    ["[", "]"],
-    ["{", "}"]
+    [
+      "[",
+      "]"
+    ],
+    [
+      "{",
+      "}"
+    ]
   ],
   "autoClosingPairs": [
     {
       "open": "\"",
       "close": "\"",
-      "notIn": ["string"]
+      "notIn": [
+        "string"
+      ]
     },
     {
       "open": "[",
@@ -27,13 +34,22 @@
     }
   ],
   "surroundingPairs": [
-    ["\"", "\""],
-    ["[", "]"],
-    ["{", "}"]
+    [
+      "\"",
+      "\""
+    ],
+    [
+      "[",
+      "]"
+    ],
+    [
+      "{",
+      "}"
+    ]
   ],
   "indentationRules": {
     "increaseIndentPattern": {
-      "pattern": "^\\s*(?:[A-Za-z_][A-Za-z0-9_-]*|-\\s+[A-Za-z_][A-Za-z0-9_-]*)\\s*:\\s*$"
+      "pattern": "^\\s*(?:-\\s+)?(?:[A-Za-z_][A-Za-z0-9_.-]*|\"[^\"]*\")(?:\\[\\d*\\])?(?:\\{[^}]*\\})?\\s*:\\s*(?:\\|\\s*)?$"
     },
     "decreaseIndentPattern": {
       "pattern": "^\\s*$"
@@ -41,7 +57,7 @@
   },
   "onEnterRules": [
     {
-      "beforeText": "^\\s*(?:[A-Za-z_][A-Za-z0-9_-]*|-\\s+[A-Za-z_][A-Za-z0-9_-]*)\\s*:\\s*$",
+      "beforeText": "^\\s*(?:-\\s+)?(?:[A-Za-z_][A-Za-z0-9_.-]*|\"[^\"]*\")(?:\\[\\d*\\])?(?:\\{[^}]*\\})?\\s*:\\s*(?:\\|\\s*)?$",
       "action": {
         "indent": "indent"
       }

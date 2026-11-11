@@ -58,6 +58,25 @@ pub fn format(source: &str) -> Vec<u8> {
     }
 }
 
+/// Runs an AXS query (see `spec/QUERY.md`) on a decoded object payload and
+/// encodes the resulting value.
+#[wasm_bindgen]
+pub fn query(payload: &[u8], query: &str) -> Vec<u8> {
+    match codec::decode_object(payload).and_then(|object| axs::query(&object, query)) {
+        Ok(value) => codec::encode_ok_value(&value),
+        Err(error) => codec::encode_error(&error),
+    }
+}
+
+/// Runs an AXS query on AXS text and encodes the resulting value.
+#[wasm_bindgen(js_name = querySource)]
+pub fn query_source(source: &str, query: &str) -> Vec<u8> {
+    match axs::parse(source).and_then(|object| axs::query(&object, query)) {
+        Ok(value) => codec::encode_ok_value(&value),
+        Err(error) => codec::encode_error(&error),
+    }
+}
+
 /// Decodes an object payload and serializes it with the canonical AXS serializer.
 #[wasm_bindgen]
 pub fn stringify(payload: &[u8]) -> Vec<u8> {

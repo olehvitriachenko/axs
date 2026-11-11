@@ -16,7 +16,7 @@ server.port = 8080;
 console.log(stringify(config));
 
 try {
-  parse("server:\n  port = 1\n  port = 2\n");
+  parse("server:\n  port: 1\n  port: 2\n");
 } catch (error) {
   if (error instanceof AxsError) {
     console.log(`${error.code} ${error.kind} at ${error.line}:${error.column}`);

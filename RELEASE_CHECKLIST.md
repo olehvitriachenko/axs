@@ -1,6 +1,6 @@
 # AXS prerelease checklist
 
-Updated 2026-10-11 on `feat/typescript-sdk`. Rust crate: `0.1.0`; npm SDK
+Updated 2026-11-11 on `v2` (Grammar v3, queries; the rest of this checklist still describes the earlier v2-grammar checkout and has not been re-verified). Rust crate: `0.1.0`; npm SDK
 checkout: `@axs-lang/core` `0.2.0`; VS Code extension: `0.1.0`.
 These are independent package versions. This follow-up commits existing changes
 and prepares package links; it does not publish, push, tag, or bump versions.

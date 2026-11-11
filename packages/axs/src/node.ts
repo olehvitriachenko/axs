@@ -3,7 +3,7 @@
  * this module is first loaded, so `parse` and `stringify` work immediately.
  */
 import * as wasm from "../wasm/node.cjs";
-import { type AxsObject, createApi } from "./core.js";
+import { type AxsObject, type AxsValue, createApi } from "./core.js";
 
 export {
   AxsError,
@@ -31,11 +31,12 @@ export function parse(source: string): AxsObject {
 }
 
 /**
- * Serializes a plain object to canonical AXS text (sorted keys, LF newlines).
+ * Serializes a plain object to canonical AXS text (keys in insertion order, LF newlines).
  *
  * @throws {AxsError} for unsupported values: undefined, functions, symbols,
  * cycles, non-finite numbers, unsafe integer numbers (use bigint), bigints
- * outside i64, class instances, invalid keys, or exceeded limits.
+ * outside i64, class instances, or exceeded limits. Keys that are not bare AXS
+ * keys are written quoted.
  */
 export function stringify(value: AxsObject): string;
 export function stringify(value: object): string;
@@ -55,9 +56,9 @@ export function check(source: string): void {
 
 /**
  * Canonically formats an AXS document, producing the same text as `axs fmt`
- * (sorted keys, canonical quoting, LF newlines). Values never pass through
+ * (key order kept, canonical quoting, LF newlines). Values never pass through
  * JavaScript numbers, so `1.0` stays a float and large floats are kept exactly.
- * Comments, original quoting, and key order are not preserved.
+ * Comments and original quoting are not preserved.
  *
  * @throws {AxsError} for invalid documents.
  */
@@ -71,4 +72,16 @@ export function format(source: string): string {
  */
 export function init(): Promise<void> {
   return Promise.resolve();
+}
+
+/**
+ * Runs an AXS query (`users[age > 20]{name}`; see spec/QUERY.md) on a
+ * document, given as AXS text or a plain object, and returns the selected
+ * value.
+ *
+ * @throws {AxsError} with kind `InvalidQuery` (AXS012) for invalid queries,
+ * missing fields, or out-of-range indexes, or for invalid documents.
+ */
+export function query(document: object | string, query: string): AxsValue {
+  return api.query(document, query);
 }

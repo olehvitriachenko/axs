@@ -112,8 +112,8 @@ exports.run = async function run() {
     assert.equal(diagnostic.source, "AXS");
     assert.equal(diagnostic.severity, vscode.DiagnosticSeverity.Error);
     assert.equal(diagnostic.range.start.line, 1);
-    // `title = "🚀\q"`: the string starts at UTF-16 offset 8.
-    assert.equal(diagnostic.range.start.character, 8);
+    // `title: "🚀\q"`: the string starts at UTF-16 offset 7.
+    assert.equal(diagnostic.range.start.character, 7);
     return { message: diagnostic.message, range: `${diagnostic.range.start.line}:${diagnostic.range.start.character}-${diagnostic.range.end.character}` };
   });
 
@@ -126,32 +126,32 @@ exports.run = async function run() {
   });
 
   await step("live diagnostics are debounced (~400 ms)", async () => {
-    const { document, editor } = await scratch("a = 1\n");
+    const { document, editor } = await scratch("a: 1\n");
     await sleep(100);
     assert.deepEqual(diagnosticsOf(document), []);
     const edited = Date.now();
-    await replaceAll(editor, "a = 1\na = 2\n");
+    await replaceAll(editor, "a: 1\na: 2\n");
     await sleep(200);
     assert.equal(diagnosticsOf(document).length, 0, "reported before the debounce elapsed");
     await waitFor(() => diagnosticsOf(document).length === 1, 3000);
     const latency = Date.now() - edited;
     assert.ok(latency >= 350, `reported after ${latency} ms`);
-    await replaceAll(editor, "a = 1\n");
+    await replaceAll(editor, "a: 1\n");
     await waitFor(() => diagnosticsOf(document).length === 0, 3000);
     return { latencyMs: latency };
   });
 
   await step("rapid edits: the newest text always wins", async () => {
-    const { document, editor } = await scratch("a = 1\n");
+    const { document, editor } = await scratch("a: 1\n");
     for (let round = 0; round < 10; round += 1) {
-      await replaceAll(editor, round % 2 === 0 ? "a = 1\na = 2\n" : "a = 1\n");
+      await replaceAll(editor, round % 2 === 0 ? "a: 1\na: 2\n" : "a: 1\n");
       await sleep(30);
     }
     await sleep(800);
     assert.deepEqual(diagnosticsOf(document), [], "final valid text must have no diagnostics");
-    await replaceAll(editor, "a = 1\n");
+    await replaceAll(editor, "a: 1\n");
     for (let round = 0; round < 10; round += 1) {
-      await replaceAll(editor, round % 2 === 0 ? "a = 1\n" : "b:\n   c = 1\n");
+      await replaceAll(editor, round % 2 === 0 ? "a: 1\n" : "b:\n   c: 1\n");
       await sleep(30);
     }
     await waitFor(() => diagnosticsOf(document).length === 1, 3000);
@@ -163,8 +163,8 @@ exports.run = async function run() {
     const { document } = await open("unformatted-crlf.axs");
     assert.equal(document.eol, vscode.EndOfLine.CRLF);
     await vscode.commands.executeCommand("editor.action.formatDocument");
-    await waitFor(() => document.getText() !== "z = 1\r\nb = 1.0\r\na:\r\n  - x\r\n", 3000);
-    assert.equal(document.getText(), "a:\r\n  - x\r\nb = 1.0\r\nz = 1\r\n");
+    await waitFor(() => document.getText() !== "z: 1\r\nb: 1.0\r\na:\r\n  - x\r\n", 3000);
+    assert.equal(document.getText(), "z: 1\r\nb: 1.0\r\na[1]: [x]\r\n");
     const again = await vscode.commands.executeCommand(
       "vscode.executeFormatDocumentProvider",
       document.uri,
@@ -181,7 +181,7 @@ exports.run = async function run() {
       { tabSize: 2, insertSpaces: true }
     );
     assert.equal((edits ?? []).length, 0);
-    assert.equal(document.getText(), "a = 1\na = 2\n");
+    assert.equal(document.getText(), "a: 1\na: 2\n");
   });
 
   await step("Smart Enter: objects, lists, nesting, and ending lists", async () => {
@@ -193,8 +193,8 @@ exports.run = async function run() {
     await vscode.commands.executeCommand("redo");
     assert.equal(editor.document.getText(), "server:\n  - ");
 
-    await replaceAll(editor, "server:\n  port = 1");
-    assert.equal(await enterAt(editor, 0, 7), "server:\n  \n  port = 1", "existing object keeps its style");
+    await replaceAll(editor, "server:\n  port: 1");
+    assert.equal(await enterAt(editor, 0, 7), "server:\n  \n  port: 1", "existing object keeps its style");
 
     await replaceAll(editor, "skills:\n  - Rust");
     assert.equal(await enterAt(editor, 1, 8), "skills:\n  - Rust\n  - ", "list continues");
@@ -210,11 +210,11 @@ exports.run = async function run() {
     await replaceAll(editor, "matrix:\n  -");
     assert.equal(await enterAt(editor, 1, 3), "matrix:\n  -\n    - ", "bare dash opens nested");
 
-    await replaceAll(editor, "people:\n  - name = Oleh");
-    assert.equal(await enterAt(editor, 1, 15), "people:\n  - name = Oleh\n    ", "inline object field");
+    await replaceAll(editor, "people:\n  - name: Oleh");
+    assert.equal(await enterAt(editor, 1, 15), "people:\n  - name: Oleh\n    ", "inline object field");
 
-    await replaceAll(editor, "  port = 1");
-    assert.equal(await enterAt(editor, 0, 10), "  port = 1\n  ", "assignment keeps indent");
+    await replaceAll(editor, "  port: 1");
+    assert.equal(await enterAt(editor, 0, 9), "  port: 1\n  ", "assignment keeps indent");
   });
 
   await step("Smart Enter object preference is read from configuration", async () => {

@@ -31,7 +31,10 @@ export type AxsErrorKind =
   | "UnexpectedEof"
   | "InvalidString"
   | "InvalidNumber"
-  | "SyntaxError";
+  | "SyntaxError"
+  | "LengthMismatch"
+  | "InvalidCollection"
+  | "InvalidQuery";
 
 /** Stable AXS error codes, one per {@link AxsErrorKind}. */
 export type AxsErrorCode =
@@ -43,7 +46,10 @@ export type AxsErrorCode =
   | "AXS006"
   | "AXS007"
   | "AXS008"
-  | "AXS009";
+  | "AXS009"
+  | "AXS010"
+  | "AXS011"
+  | "AXS012";
 
 const CODES: Record<AxsErrorKind, AxsErrorCode> = {
   UnexpectedToken: "AXS001",
@@ -54,7 +60,10 @@ const CODES: Record<AxsErrorKind, AxsErrorCode> = {
   UnexpectedEof: "AXS006",
   InvalidString: "AXS007",
   InvalidNumber: "AXS008",
-  SyntaxError: "AXS009"
+  SyntaxError: "AXS009",
+  LengthMismatch: "AXS010",
+  InvalidCollection: "AXS011",
+  InvalidQuery: "AXS012"
 };
 
 export interface AxsErrorDetails {
@@ -120,6 +129,8 @@ export interface WasmBindings {
   stringify(payload: Uint8Array): Uint8Array;
   check(source: string): Uint8Array;
   format(source: string): Uint8Array;
+  query(payload: Uint8Array, query: string): Uint8Array;
+  querySource(source: string, query: string): Uint8Array;
   payloadVersion(): number;
 }
 
@@ -163,6 +174,7 @@ export function createApi(bindings: () => WasmBindings): {
   stringify(value: object): string;
   check(source: string): void;
   format(source: string): string;
+  query(document: object | string, query: string): AxsValue;
 } {
   let checked = false;
   const load = (): WasmBindings => {
@@ -200,6 +212,18 @@ export function createApi(bindings: () => WasmBindings): {
         throw new Reader(result).failure();
       }
       return decoder.decode(result.subarray(1));
+    },
+
+    query(document: object | string, query: string): AxsValue {
+      if (typeof query !== "string") {
+        throw new TypeError("AXS query must be a string");
+      }
+      validateSource(query);
+      if (typeof document === "string") {
+        validateSource(document);
+        return new Reader(load().querySource(document, query)).result();
+      }
+      return new Reader(load().query(encodeDocument(document), query)).result();
     },
 
     stringify(value: object): string {
@@ -258,6 +282,14 @@ class Reader {
       throw new Error("AXS WebAssembly returned a non-object document");
     }
     return value;
+  }
+
+  /** Reads a query envelope: returns any value or throws its AxsError. */
+  result(): AxsValue {
+    if (this.u8() !== 0) {
+      throw this.error();
+    }
+    return this.value();
   }
 
   /** Reads a failed envelope's AxsError. */

@@ -9,9 +9,12 @@
 // | `- key:`                     | new line indented +4, with `- ` by default   |
 // | `-` (bare nested opener)     | new line indented +2, with `- ` by default   |
 // | `- value`                    | new line `- ` at the same indent               |
-// | `- key = value`              | new line indented +2 (next inline-object field)|
+// | `key[N]:` (array header)     | like `key:`, with `- ` by default              |
+// | `key{a,b}:` (table header)   | new line indented +2, no marker (rows have none)|
+// | `key: |` (text block)        | new line indented +2, no marker                |
+// | `- key: value`               | new line indented +2 (next inline-object field)|
 // | `- ` (empty item)            | dash removed, line outdented one level         |
-// | `key = value`                | new line at the same indent                    |
+// | `key: value`                 | new line at the same indent                    |
 //
 // Existing children override the preference, so adding a field to an object
 // never inserts a list marker. Comments, invalid indentation, and Enter with
@@ -26,10 +29,15 @@ export type EnterPlan =
   /** Replace the current line's text with `text`, cursor at its end. */
   | { kind: "replaceLine"; text: string };
 
-const KEY = "[A-Za-z_][A-Za-z0-9_-]*";
-const BLOCK_HEADER = new RegExp(`^${KEY}\\s*:\\s*$`);
-const INLINE_BLOCK_HEADER = new RegExp(`^-\\s+${KEY}\\s*:\\s*$`);
-const INLINE_FIELD = new RegExp(`^-\\s+${KEY}\\s*=`);
+// A bare or quoted key, optionally followed by `[N]` and a table's `{a,b}`.
+const KEY = '(?:[A-Za-z_][A-Za-z0-9_.-]*|"(?:[^"\\\\]|\\\\.)*")';
+const HEADER = `${KEY}(?:\\[\\d*\\])?(\\{[^}]*\\})?\\s*:\\s*$`;
+const BLOCK_HEADER = new RegExp(`^${HEADER}`);
+const INLINE_BLOCK_HEADER = new RegExp(`^-\\s+${HEADER}`);
+const TEXT_HEADER = new RegExp(`^${KEY}\\s*:\\s+\\|\\s*$`);
+const INLINE_TEXT_HEADER = new RegExp(`^-\\s+${KEY}\\s*:\\s+\\|\\s*$`);
+const ITEM_TEXT = /^-\s+\|\s*$/;
+const INLINE_FIELD = new RegExp(`^-\\s+${KEY}(?:\\[\\d*\\])?\\s*:\\s+\\S`);
 const EMPTY_ITEM = /^-\s+$/;
 const SCALAR_ITEM = /^-\s+\S/;
 const LIST_ITEM = /^-(?:\s|$)/;
@@ -65,21 +73,32 @@ export function planEnter(
     return { kind: "default" };
   }
 
-  const header = (childIndent: number): EnterPlan => ({
+  // Table rows and text lines carry no marker, so they never get a `- `.
+  const header = (childIndent: number, markerless = false): EnterPlan => ({
     kind: "insert",
     text: `\n${" ".repeat(childIndent)}${
-      childIsList(nextContentLine, childIndent, defaultCollection) ? "- " : ""
+      !markerless && childIsList(nextContentLine, childIndent, defaultCollection) ? "- " : ""
     }`
   });
 
-  if (BLOCK_HEADER.test(content)) {
-    return header(indent + INDENT);
+  const blockHeader = BLOCK_HEADER.exec(content);
+  if (blockHeader) {
+    return header(indent + INDENT, blockHeader[1] !== undefined);
   }
 
   // `- key:` opens an inline object whose `key` value sits four spaces below
-  // the dash (Grammar v2).
-  if (INLINE_BLOCK_HEADER.test(content)) {
-    return header(indent + 2 * INDENT);
+  // the dash (Grammar v3).
+  const inlineHeader = INLINE_BLOCK_HEADER.exec(content);
+  if (inlineHeader) {
+    return header(indent + 2 * INDENT, inlineHeader[1] !== undefined);
+  }
+
+  if (TEXT_HEADER.test(content) || ITEM_TEXT.test(content)) {
+    return header(indent + INDENT, true);
+  }
+
+  if (INLINE_TEXT_HEADER.test(content)) {
+    return header(indent + 2 * INDENT, true);
   }
 
   if (content.trimEnd() === "-" && !EMPTY_ITEM.test(content)) {
